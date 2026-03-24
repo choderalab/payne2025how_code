@@ -1,6 +1,5 @@
 from pathlib import Path
 from pydantic import BaseModel, Field
-from drugforge.modeling.modeling import superpose_molecule
 from drugforge.modeling.schema import PreppedComplex
 from drugforge.modeling.modeling import find_component_chains
 from drugforge.data.backend.openeye import oechem, oespruce

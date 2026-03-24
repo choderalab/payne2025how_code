@@ -85,7 +85,7 @@ process CALCULATE_PROTEIN_RMSD_FULL {
     tag "full|${ref_id}"
 
     input:
-    tuple val(ref_id), path(ref_json), path(cache_dir)
+    tuple val(ref_id), path(ref_json), path(cache_dir, stageAs: 'cache_dir')
 
     output:
     path("protein_rmsd_full_${ref_id}.csv"), emit: protein_rmsd_full
@@ -94,7 +94,7 @@ process CALCULATE_PROTEIN_RMSD_FULL {
     """
     python3 "${params.scripts}"/calculate_protein_RMSD.py \
         --ref_json "${ref_json}" \
-        --cache_dir "${cache_dir}" \
+        --cache_dir "cache_dir" \
         --output_csv "protein_rmsd_full_${ref_id}.csv"
     """
 }
@@ -104,7 +104,7 @@ process CALCULATE_PROTEIN_RMSD_BINDING_SITE {
     tag "binding_site|${ref_id}"
 
     input:
-    tuple val(ref_id), path(ref_json), path(cache_dir)
+    tuple val(ref_id), path(ref_json), path(cache_dir, stageAs: 'cache_dir')
 
     output:
     path("protein_rmsd_binding_site_${ref_id}.csv"), emit: protein_rmsd_binding_site
@@ -113,14 +113,14 @@ process CALCULATE_PROTEIN_RMSD_BINDING_SITE {
     """
     python3 "${params.scripts}"/calculate_protein_RMSD.py \
         --ref_json "${ref_json}" \
-        --cache_dir "${cache_dir}" \
+        --cache_dir "cache_dir" \
         --binding_site \
         --output_csv "protein_rmsd_binding_site_${ref_id}.csv"
     """
 }
 process COMBINE_PROTEIN_RMSD_DATA {
     publishDir "${params.proteinRmsdData}", mode: 'copy', overwrite: true
-    conda "${params.drugforge}"
+    conda "${params.asap}"
     tag "combine-protein-rmsd-data"
 
     input:
