@@ -10,7 +10,7 @@ process GENERATE_DATE_DICTIONARY {
 
     script:
     """
-    python3 "${params.scripts}"/generate_date_dict.py --fragalysis-dir "${params.curatedFragalysis}" --output-dir cmpd_date_dict
+    python3 "${projectDir}/scripts"/generate_date_dict.py --fragalysis-dir "${params.curatedFragalysis}" --output-dir cmpd_date_dict
     """
 }
 process CALCULATE_ECFP_TANIMOTO {
@@ -26,7 +26,7 @@ process CALCULATE_ECFP_TANIMOTO {
 
     script:
     """
-    python3 "${params.scripts}"/calculate_ecfp_tanimoto.py --ref-ligand-sdf "${ligand_file_3d}" --output-dir ecfp_tanimoto
+    python3 "${projectDir}/scripts"/calculate_ecfp_tanimoto.py --ref-ligand-sdf "${ligand_file_3d}" --output-dir ecfp_tanimoto
     """
 }
 process CALCULATE_MCS_TANIMOTO {
@@ -43,7 +43,7 @@ process CALCULATE_MCS_TANIMOTO {
 
     script:
     """
-    python3 "${params.scripts}"/calculate_mcs_tanimoto.py --ref-ligand-sdf "${ligand_file_3d}" --output-dir mcs_tanimoto --ncpus 32
+    python3 "${projectDir}/scripts"/calculate_mcs_tanimoto.py --ref-ligand-sdf "${ligand_file_3d}" --output-dir mcs_tanimoto --ncpus 32
     """
 }
 process CALCULATE_TANIMOTO_COMBO {
@@ -60,7 +60,7 @@ process CALCULATE_TANIMOTO_COMBO {
 
     script:
     """
-    python3 "${params.scripts}"/calculate_tanimoto_combo.py --ref-ligand-sdf "${ligand_file_3d}" --output-dir tanimoto_combo
+    python3 "${projectDir}/scripts"/calculate_tanimoto_combo.py --ref-ligand-sdf "${ligand_file_3d}" --output-dir tanimoto_combo
     """
 }
 process COMBINE_CHEMICAL_SIMILARITY_DATA {
@@ -76,7 +76,7 @@ process COMBINE_CHEMICAL_SIMILARITY_DATA {
 
     script:
     """
-    python3 "${params.scripts}/combine_chemical_similarity_data.py" ${csv_files.join(' ')}
+    python3 "${projectDir}/scripts/combine_chemical_similarity_data.py" ${csv_files.join(' ')}
     """
 }
 process CALCULATE_PROTEIN_RMSD_FULL {
@@ -148,6 +148,6 @@ process RUN_BEMIS_MURCKO_CLUSTERING {
 
     script:
     """
-    python "${params.scripts}"/run_bemis_murcko_clustering.py --sdf-2d ${ligand_file_2d} --output-dir "${params.scaffoldDataName}"
+    python "${projectDir}/scripts"/run_bemis_murcko_clustering.py --sdf-2d ${ligand_file_2d} --output-dir "${params.scaffoldDataName}"
     """
 }
