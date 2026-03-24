@@ -4,7 +4,14 @@ import click
 import MDAnalysis as mda
 from MDAnalysis.analysis.rms import rmsd
 
-from protein_rmsd_schema import ProteinRMSD
+from protein_rmsd_schema import AtomSelection, ProteinRMSD
+
+# MDAnalysis selection string for each AtomSelection option
+ATOM_SELECTION_MAP = {
+    AtomSelection.all_atom: "protein",
+    AtomSelection.heavy_atom: "protein and not name H*",
+    AtomSelection.c_alpha: "protein and name CA",
+}
 
 # Binding site residue numbers for Mpro (used when --binding_site is set)
 BINDING_SITE_RESIDUES = [
@@ -41,9 +48,10 @@ def calculate_rmsd(
     mobile_pdb: Path,
     chain: str = "A",
     binding_site_residues: list[int] | None = None,
+    atom_selection: AtomSelection = AtomSelection.heavy_atom,
 ) -> float:
     """
-    Calculate the Cα RMSD between two protein structures after superposition.
+    Calculate the protein RMSD between two structures after superposition.
 
     Uses MDAnalysis to load both structures, select the desired atoms on the
     specified chain, superpose the mobile onto the reference, and return the RMSD.
@@ -57,22 +65,30 @@ def calculate_rmsd(
     chain : str
         Chain ID to use for alignment (default: "A").
     binding_site_residues : list[int] or None
-        If provided, restrict alignment and RMSD to Cα atoms of these residue
-        numbers only. If None, all Cα atoms on the chain are used.
+        If provided, restrict alignment and RMSD to atoms of these residue
+        numbers only. If None, all atoms matching atom_selection are used.
+    atom_selection : AtomSelection
+        Which atoms to use: all_atom, heavy_atom (default), or c_alpha.
 
     Returns
     -------
     float
-        Cα RMSD in Ångströms after superposition.
+        RMSD in Ångströms after superposition.
     """
     ref_u = mda.Universe(str(ref_pdb))
     mobile_u = mda.Universe(str(mobile_pdb))
 
-    if binding_site_residues is not None:
-        resid_sel = " or ".join(f"resid {r}" for r in binding_site_residues)
-        sel = f"protein and chainID {chain} and name CA and ({resid_sel})"
+    base_sel = ATOM_SELECTION_MAP[atom_selection]
+    resid_sel = (
+        " or ".join(f"resid {r}" for r in binding_site_residues)
+        if binding_site_residues is not None
+        else None
+    )
+
+    if resid_sel is not None:
+        sel = f"({base_sel}) and chainID {chain} and ({resid_sel})"
     else:
-        sel = f"protein and chainID {chain} and name CA"
+        sel = f"({base_sel}) and chainID {chain}"
 
     ref_atoms = ref_u.select_atoms(sel)
     mobile_atoms = mobile_u.select_atoms(sel)
@@ -83,9 +99,9 @@ def calculate_rmsd(
             f"Trying without chain filter."
         )
         fallback_sel = (
-            "protein and name CA"
-            if binding_site_residues is None
-            else (f"protein and name CA and ({resid_sel})")
+            base_sel
+            if resid_sel is None
+            else f"({base_sel}) and ({resid_sel})"
         )
         ref_atoms = ref_u.select_atoms(fallback_sel)
         mobile_atoms = mobile_u.select_atoms(fallback_sel)
@@ -95,10 +111,8 @@ def calculate_rmsd(
             f"Atom count mismatch between {ref_pdb.stem} ({len(ref_atoms)}) "
             f"and {mobile_pdb.stem} ({len(mobile_atoms)}). RMSD may be unreliable."
         )
-        # trim to the smaller set by matching residue IDs present in both
-        ref_resids = set(ref_atoms.resids)
-        mob_resids = set(mobile_atoms.resids)
-        common = sorted(ref_resids & mob_resids)
+        # trim to residue IDs present in both
+        common = sorted(set(ref_atoms.resids) & set(mobile_atoms.resids))
         resid_filter = " or ".join(f"resid {r}" for r in common)
         ref_atoms = ref_u.select_atoms(f"({sel}) and ({resid_filter})")
         mobile_atoms = mobile_u.select_atoms(f"({sel}) and ({resid_filter})")
@@ -152,13 +166,22 @@ def _find_pdb(subdir: Path) -> Path | None:
     show_default=True,
     help="Chain ID to use for alignment",
 )
-def main(ref_dir, mobile_dir, cache_dir, output_csv, binding_site, chain):
-    """Calculate pairwise protein Cα RMSD using MDAnalysis.
+@click.option(
+    "--atom_selection",
+    type=click.Choice([a.value for a in AtomSelection], case_sensitive=False),
+    default=AtomSelection.heavy_atom.value,
+    show_default=True,
+    help="Atom selection for alignment and RMSD: all_atom, heavy_atom, or c_alpha",
+)
+def main(
+    ref_dir, mobile_dir, cache_dir, output_csv, binding_site, chain, atom_selection
+):
+    """Calculate pairwise protein RMSD using MDAnalysis.
 
     Provide either --mobile_dir for a single pairwise calculation, or --cache_dir to
     compare the reference against all structure subdirectories in the cache.
     Results are written to --output_csv with columns: Reference_Structure, Query_Structure,
-    RMSD, Binding_Site_Only.
+    RMSD, Binding_Site_Only, Atom_Selection.
     """
     if mobile_dir is None and cache_dir is None:
         raise click.UsageError("Provide either --mobile_dir or --cache_dir.")
@@ -166,6 +189,7 @@ def main(ref_dir, mobile_dir, cache_dir, output_csv, binding_site, chain):
         raise click.UsageError("Provide either --mobile_dir or --cache_dir, not both.")
 
     bs_residues = BINDING_SITE_RESIDUES if binding_site else None
+    atom_sel = AtomSelection(atom_selection)
 
     # Resolve the reference PDB and ID from the ref subdir
     ref_pdb = _find_pdb(Path(ref_dir))
@@ -198,6 +222,7 @@ def main(ref_dir, mobile_dir, cache_dir, output_csv, binding_site, chain):
             mobile_pdb=mobile_pdb,
             chain=chain,
             binding_site_residues=bs_residues,
+            atom_selection=atom_sel,
         )
         rows.append(
             ProteinRMSD.from_superposition(
@@ -205,6 +230,7 @@ def main(ref_dir, mobile_dir, cache_dir, output_csv, binding_site, chain):
                 mobile_id=mobile_id,
                 rmsd=r,
                 binding_site_only=binding_site,
+                atom_selection=atom_sel,
             )
         )
 

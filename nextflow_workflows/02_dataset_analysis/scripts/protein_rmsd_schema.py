@@ -1,6 +1,15 @@
 from pydantic import BaseModel, Field
+from enum import Enum
 import json
 import pandas as pd
+
+
+class AtomSelection(str, Enum):
+    """Atom selection used for structural alignment and RMSD calculation."""
+
+    all_atom = "all_atom"
+    heavy_atom = "heavy_atom"
+    c_alpha = "c_alpha"
 
 
 class ProteinRMSD(BaseModel):
@@ -23,6 +32,10 @@ class ProteinRMSD(BaseModel):
         description="True if only binding-site residues were used for alignment; "
         "False if the full chain-A was used",
     )
+    Atom_Selection: AtomSelection = Field(
+        AtomSelection.heavy_atom,
+        description="Atom selection used for alignment and RMSD calculation",
+    )
 
     def save(self, path):
         with open(path, "w") as f:
@@ -36,8 +49,8 @@ class ProteinRMSD(BaseModel):
     def __str__(self):
         scope = "binding-site" if self.Binding_Site_Only else "full chain-A"
         return (
-            f"Protein RMSD ({scope}) between {self.Reference_Structure} "
-            f"and {self.Query_Structure}: {self.RMSD:.4f} Å"
+            f"Protein RMSD ({scope}, {self.Atom_Selection.value}) between "
+            f"{self.Reference_Structure} and {self.Query_Structure}: {self.RMSD:.4f} Å"
         )
 
     @classmethod
@@ -51,6 +64,7 @@ class ProteinRMSD(BaseModel):
         mobile_id: str,
         rmsd: float,
         binding_site_only: bool,
+        atom_selection: AtomSelection = AtomSelection.heavy_atom,
     ) -> "ProteinRMSD":
         """Convenience constructor that accepts the raw outputs of superpose_molecule."""
         return cls(
@@ -58,4 +72,5 @@ class ProteinRMSD(BaseModel):
             Query_Structure=mobile_id,
             RMSD=round(rmsd, 4),
             Binding_Site_Only=binding_site_only,
+            Atom_Selection=atom_selection,
         )
