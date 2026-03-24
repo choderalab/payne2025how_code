@@ -120,7 +120,7 @@ process CALCULATE_PROTEIN_RMSD_BINDING_SITE {
 }
 process COMBINE_PROTEIN_RMSD_DATA {
     publishDir "${params.proteinRmsdData}", mode: 'copy', overwrite: true
-    conda "${params.asap}"
+    conda "${params.drugforge}"
     tag "combine-protein-rmsd-data"
 
     input:
