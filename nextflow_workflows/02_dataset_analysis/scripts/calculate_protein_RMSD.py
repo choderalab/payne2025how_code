@@ -178,7 +178,9 @@ def main(ref_dir, mobile_dir, cache_dir, output_csv, binding_site):
 
     # Load mobile structures
     mobile_dir_path = mobile_dir if mobile_dir is not None else cache_dir
-    mobile_complexes = MetaStructureFactory(structure_dir=mobile_dir_path).load()
+    mobile_complexes = MetaStructureFactory(
+        structure_dir=mobile_dir_path, fragalysis_dir=None, pdb_file=None
+    ).load()
 
     # Exclude self
     mobile_complexes = [c for c in mobile_complexes if c.target.target_name != ref_id]
