@@ -66,9 +66,9 @@ workflow COMBINE_SIMILARITY_DATA {
 workflow PROTEIN_RMSD_ANALYSIS {
     cache_dir = Channel.fromPath("${params.fixedFragalysisCachePath}", type: 'dir')
 
-    // One channel item per reference JSON: (ref_id, ref_json, cache_dir)
+    // One channel item per reference PDB: (ref_id, ref_pdb, cache_dir)
     ref_inputs = Channel
-        .fromPath("${params.fixedFragalysisCachePath}/**/*.json")
+        .fromPath("${params.fixedFragalysisCachePath}/**/*.pdb")
         .map { f -> tuple(f.baseName, f) }
         .combine(cache_dir)   // attach the single cache_dir value to every ref
 

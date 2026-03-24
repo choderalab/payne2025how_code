@@ -1,6 +1,6 @@
 from pathlib import Path
 from pydantic import BaseModel, Field
-from drugforge.modeling.schema import PreppedComplex
+from drugforge.data.schema.complex import Complex
 from drugforge.modeling.modeling import find_component_chains
 from drugforge.data.backend.openeye import oechem, oespruce
 import warnings
@@ -117,28 +117,28 @@ def superpose_molecule(
 
 @click.command("calculate_protein_RMSD")
 @click.option(
-    "--ref_json",
+    "--ref_pdb",
     type=click.Path(exists=True),
     required=True,
-    help="Path to reference PreppedComplex JSON file",
+    help="Path to reference structure PDB file",
 )
 @click.option(
-    "--mobile_json",
+    "--mobile_pdb",
     type=click.Path(exists=True),
     default=None,
-    help="Path to a single mobile PreppedComplex JSON file",
+    help="Path to a single mobile structure PDB file",
 )
 @click.option(
     "--cache_dir",
     type=click.Path(exists=True, file_okay=False),
     default=None,
-    help="Directory of PreppedComplex JSON files to compare against the reference",
+    help="Directory of structure PDB files to compare against the reference",
 )
 @click.option(
     "--output_csv",
     type=click.Path(),
     required=True,
-    help="Path to output CSV file (columns: ref_id, mobile_id, rmsd)",
+    help="Path to output CSV file (columns: Reference_Structure, Query_Structure, RMSD, Binding_Site_Only)",
 )
 @click.option(
     "--binding_site",
@@ -146,17 +146,18 @@ def superpose_molecule(
     default=False,
     help="Use binding site residues for alignment",
 )
-def main(ref_json, mobile_json, cache_dir, output_csv, binding_site):
+def main(ref_pdb, mobile_pdb, cache_dir, output_csv, binding_site):
     """Calculate RMSD between a reference structure and one or more mobile structures.
 
-    Provide either --mobile_json for a single pairwise calculation, or --cache_dir to
-    compare the reference against every JSON file found in that directory.
-    Results are written to --output_csv with columns: ref_id, mobile_id, rmsd.
+    Provide either --mobile_pdb for a single pairwise calculation, or --cache_dir to
+    compare the reference against every PDB file found in that directory.
+    Results are written to --output_csv with columns: Reference_Structure, Query_Structure,
+    RMSD, Binding_Site_Only.
     """
-    if mobile_json is None and cache_dir is None:
-        raise click.UsageError("Provide either --mobile_json or --cache_dir.")
-    if mobile_json is not None and cache_dir is not None:
-        raise click.UsageError("Provide either --mobile_json or --cache_dir, not both.")
+    if mobile_pdb is None and cache_dir is None:
+        raise click.UsageError("Provide either --mobile_pdb or --cache_dir.")
+    if mobile_pdb is not None and cache_dir is not None:
+        raise click.UsageError("Provide either --mobile_pdb or --cache_dir, not both.")
 
     bs = None
     if binding_site:
@@ -165,23 +166,25 @@ def main(ref_json, mobile_json, cache_dir, output_csv, binding_site):
         )
         bs = BindingSite(residues=binding_site_residues)
 
-    ref = PreppedComplex.from_json_file(ref_json)
+    ref_id = Path(ref_pdb).stem
+    ref = Complex.from_pdb(ref_pdb, target_kwargs={"target_name": ref_id})
     ref_mol = ref.target.to_oemol()
-    ref_id = Path(ref_json).stem
 
-    # Build list of (mobile_id, mobile_json_path) to process
-    if mobile_json is not None:
-        mobile_files = [(Path(mobile_json).stem, Path(mobile_json))]
+    # Build list of (mobile_id, mobile_pdb_path) to process
+    if mobile_pdb is not None:
+        mobile_files = [(Path(mobile_pdb).stem, Path(mobile_pdb))]
     else:
         mobile_files = [
             (p.stem, p)
-            for p in sorted(Path(cache_dir).glob("**/*.json"))
+            for p in sorted(Path(cache_dir).glob("**/*.pdb"))
             if p.stem != ref_id
         ]
 
     rows = []
     for mobile_id, mobile_path in mobile_files:
-        mobile = PreppedComplex.from_json_file(str(mobile_path))
+        mobile = Complex.from_pdb(
+            str(mobile_path), target_kwargs={"target_name": mobile_id}
+        )
         _, rmsd = superpose_molecule(ref_mol, mobile.target.to_oemol(), binding_site=bs)
         rows.append(
             ProteinRMSD.from_superposition(
