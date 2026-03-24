@@ -60,21 +60,18 @@ workflow COMBINE_SIMILARITY_DATA {
 }
 
 // Entry point: Calculate pairwise protein RMSD for all structures in the fragalysis cache.
-// One job is launched per reference structure; each job compares that ref against the
-// entire cache directory (--cache_dir), so Nextflow fans out N jobs (one per structure)
-// rather than N² jobs.  Both full chain-A and binding-site RMSD are run in parallel.
+// Structures are grouped into batches of params.proteinRmsdChunkSize so that only
+// ceil(N / chunkSize) SLURM jobs are launched instead of one per structure.
+// Both full chain-A and binding-site RMSD are run in parallel.
 workflow PROTEIN_RMSD_ANALYSIS {
     cache_dir = Channel.fromPath("${params.fixedFragalysisCachePath}", type: 'dir')
 
-    // One channel item per reference structure: (ref_id, ref_subdir, cache_dir)
-    // Each subdirectory under the cache is passed as --ref_dir; MetaStructureFactory
-    // loads the PDB and SDF from it automatically. ref_id is taken from the PDB stem.
+    // Collect all ref subdirs, collate into fixed-size batches, then attach cache_dir.
+    // Each batch item: (batch_id, [subdir, subdir, ...], cache_dir)
     ref_inputs = Channel
         .fromPath("${params.fixedFragalysisCachePath}/*", type: 'dir')
-        .map { subdir ->
-            def pdb = subdir.listFiles().find { it.name.endsWith('.pdb') }
-            tuple(pdb.baseName, subdir)
-        }
+        .collate(params.proteinRmsdChunkSize)
+        .map { batch -> tuple(batch[0].name, batch) }
         .combine(cache_dir)
 
     // Full chain-A RMSD

@@ -22,6 +22,12 @@ import json
 @click.option("--mcs-data", type=click.Path(exists=True))
 @click.option("--scaffold-data", type=click.Path(exists=True))
 @click.option(
+    "--protein-rmsd-data",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to combined_protein_rmsd.csv produced by the PROTEIN_RMSD_ANALYSIS workflow",
+)
+@click.option(
     "--date-dict",
     type=click.Path(exists=True),
     required=True,
@@ -39,6 +45,7 @@ def main(
     ecfp_data,
     mcs_data,
     scaffold_data,
+    protein_rmsd_data,
     date_dict,
     structure_cmpd_dict,
     deduplicate,
@@ -99,6 +106,14 @@ def main(
         for ref in pose_df.Reference_Structure.unique()
     }
 
+    # Build reverse mapping: ligand -> structure, used to add Query_Structure column.
+    # Where multiple structures share the same ligand, take the first alphabetically
+    # (consistent with how reference structures are chosen elsewhere).
+    ligand_to_structure_dict = {}
+    for ref, lig in sorted(correct_ref_to_ligand_dict.items()):
+        if lig not in ligand_to_structure_dict:
+            ligand_to_structure_dict[lig] = ref
+
     # make an incorrect_to_correct ligand mapping
     pose_df["Reference_Ligand"] = pose_df["Reference_Ligand"].replace(
         incorrect_lig_to_correct_lig_dict
@@ -106,6 +121,9 @@ def main(
     pose_df["Query_Ligand"] = pose_df["Query_Ligand"].replace(
         incorrect_lig_to_correct_lig_dict
     )
+
+    # Add Query_Structure column derived from Query_Ligand via ligand_to_structure_dict
+    pose_df["Query_Structure"] = pose_df["Query_Ligand"].map(ligand_to_structure_dict)
 
     # drop any query ligands that are not in the reference structures
     pose_df = pose_df[
@@ -135,6 +153,7 @@ def main(
                 {
                     "Reference_Structure": ref_struct,
                     "Query_Ligand": query_lig,
+                    "Query_Structure": ligand_to_structure_dict.get(query_lig),
                     "Reference_Ligand": correct_ref_to_ligand_dict[ref_struct],
                     "RMSD": np.nan,
                     "Pose_ID": 0,
@@ -202,6 +221,7 @@ def main(
         dataframe=pose_df,
         key_columns=[
             "Reference_Structure",
+            "Query_Structure",
             "Query_Ligand",
             "Reference_Ligand",
             "Pose_ID",
@@ -258,6 +278,19 @@ def main(
                 key_columns=common_key_cols,
             )
         )
+    if protein_rmsd_data:
+        logger.info("Adding protein RMSD data")
+        prot_rmsd_df = pd.read_csv(protein_rmsd_data)
+        dfms.append(
+            DataFrameModel(
+                name="ProteinRMSDData",
+                type=DataFrameType.STRUCTURE_SIMILARITY,
+                dataframe=prot_rmsd_df,
+                key_columns=["Reference_Structure", "Query_Structure"],
+                param_columns=["Binding_Site_Only", "Atom_Selection"],
+            )
+        )
+        logger.info(f"Added protein RMSD data with {len(prot_rmsd_df)} rows")
     if scaffold_data:
         query_data = pd.read_csv(scaffold_data)
         query_data.columns = [

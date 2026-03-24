@@ -43,6 +43,7 @@ process COMBINE_AND_PROCESS_RESULTS {
     --structure-cmpd-dict "${params.dataPath}/cmpd_date_dict/structure_to_cmpd_dict.json" \
     --scaffold-data "${params.genericScaffoldPath}" \
     --output-file-prefix "${name}" \
+    --protein-rmsd-data "${params.combinedProteinRmsdPath}" \
     --deduplicate
     """
 }

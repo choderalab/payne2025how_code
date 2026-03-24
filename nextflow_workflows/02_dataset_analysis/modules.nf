@@ -82,40 +82,46 @@ process COMBINE_CHEMICAL_SIMILARITY_DATA {
 process CALCULATE_PROTEIN_RMSD_FULL {
     publishDir "${params.proteinRmsdData}/full_protein", mode: 'copy', overwrite: true
     conda "${params.drugforge}"
-    tag "full|${ref_id}"
+    tag "full|batch_${batch_id}"
 
     input:
-    tuple val(ref_id), path(ref_dir, stageAs: 'ref_dir'), path(cache_dir, stageAs: 'cache_dir')
+    tuple val(batch_id), path(ref_dirs), path(cache_dir, stageAs: 'cache_dir')
 
     output:
-    path("protein_rmsd_full_${ref_id}.csv"), emit: protein_rmsd_full
+    path("protein_rmsd_full_*.csv"), emit: protein_rmsd_full
 
     script:
     """
-    python3 "${projectDir}/scripts"/calculate_protein_RMSD.py \
-        --ref_dir "ref_dir" \
-        --cache_dir "cache_dir" \
-        --output_csv "protein_rmsd_full_${ref_id}.csv"
+    for ref_dir in ${ref_dirs.join(' ')}; do
+        ref_id=\$(ls "\$ref_dir"/*.pdb | xargs -n1 basename | sed 's/\\.pdb\$//')
+        python3 "${projectDir}/scripts"/calculate_protein_RMSD.py \
+            --ref_dir "\$ref_dir" \
+            --cache_dir "cache_dir" \
+            --output_csv "protein_rmsd_full_\${ref_id}.csv"
+    done
     """
 }
 process CALCULATE_PROTEIN_RMSD_BINDING_SITE {
     publishDir "${params.proteinRmsdData}/binding_site", mode: 'copy', overwrite: true
     conda "${params.drugforge}"
-    tag "binding_site|${ref_id}"
+    tag "binding_site|batch_${batch_id}"
 
     input:
-    tuple val(ref_id), path(ref_dir, stageAs: 'ref_dir'), path(cache_dir, stageAs: 'cache_dir')
+    tuple val(batch_id), path(ref_dirs), path(cache_dir, stageAs: 'cache_dir')
 
     output:
-    path("protein_rmsd_binding_site_${ref_id}.csv"), emit: protein_rmsd_binding_site
+    path("protein_rmsd_binding_site_*.csv"), emit: protein_rmsd_binding_site
 
     script:
     """
-    python3 "${projectDir}/scripts"/calculate_protein_RMSD.py \
-        --ref_dir "ref_dir" \
-        --cache_dir "cache_dir" \
-        --binding_site \
-        --output_csv "protein_rmsd_binding_site_${ref_id}.csv"
+    for ref_dir in ${ref_dirs.join(' ')}; do
+        ref_id=\$(ls "\$ref_dir"/*.pdb | xargs -n1 basename | sed 's/\\.pdb\$//')
+        python3 "${projectDir}/scripts"/calculate_protein_RMSD.py \
+            --ref_dir "\$ref_dir" \
+            --cache_dir "cache_dir" \
+            --binding_site \
+            --output_csv "protein_rmsd_binding_site_\${ref_id}.csv"
+    done
     """
 }
 process COMBINE_PROTEIN_RMSD_DATA {
