@@ -1,118 +1,118 @@
 from pathlib import Path
-from pydantic import BaseModel, Field
-from drugforge.data.readers.meta_structure_factory import MetaStructureFactory
-from drugforge.modeling.modeling import find_component_chains
-from drugforge.data.backend.openeye import oechem, oespruce
 import warnings
 import click
+import MDAnalysis as mda
+from MDAnalysis.analysis.rms import rmsd
 
 from protein_rmsd_schema import ProteinRMSD
 
-# Define pocket residues
-pockets = {
-    "P1": [142, 141, 140, 172, 163, 143, 144],
-    "P1_prime": [25, 26, 27],
-    "P2": [41, 49, 54],
-    "P3_4_5": [189, 190, 191, 192, 168, 167, 166, 165],
-}
+# Binding site residue numbers for Mpro (used when --binding_site is set)
+BINDING_SITE_RESIDUES = [
+    # P1
+    142,
+    141,
+    140,
+    172,
+    163,
+    143,
+    144,
+    # P1'
+    25,
+    26,
+    27,
+    # P2
+    41,
+    49,
+    54,
+    # P3-4-5
+    189,
+    190,
+    191,
+    192,
+    168,
+    167,
+    166,
+    165,
+]
 
 
-class BindingSite(BaseModel):
+def calculate_rmsd(
+    ref_pdb: Path,
+    mobile_pdb: Path,
+    chain: str = "A",
+    binding_site_residues: list[int] | None = None,
+) -> float:
     """
-    BindingSite
-    """
+    Calculate the Cα RMSD between two protein structures after superposition.
 
-    residues: list[int] = Field(
-        ..., description="List of residue numbers to use for alignment"
-    )
-
-
-class AlignParams(BaseModel):
-    """
-    AlignParams
-    """
-
-    align: bool = Field(
-        False, description="Whether to align the structures before calculating RMSD"
-    )
-    ref_chain: str = Field("A", description="Chain to use for reference structure")
-    mobile_chain: str = Field("A", description="Chain to use for mobile structure")
-
-
-def superpose_molecule(
-    ref_mol,
-    mobile_mol,
-    ref_chain="A",
-    mobile_chain="A",
-    binding_site: BindingSite = None,
-):
-    """
-    Superpose `mobile_mol` onto `ref_mol`.
+    Uses MDAnalysis to load both structures, select the desired atoms on the
+    specified chain, superpose the mobile onto the reference, and return the RMSD.
 
     Parameters
     ----------
-    ref_mol : oechem.OEGraphMol
-        Reference molecule to align to.
-    mobile_mol : oechem.OEGraphMol
-        Molecule to align.
-    ref_chain : Reference chain to align to
-    mobile_chain : Mobile chain to use for alignment (the whole molecule will move as well though)
-    binding_site : BindingSite to use for alignment.
+    ref_pdb : Path
+        Path to the reference structure PDB file.
+    mobile_pdb : Path
+        Path to the mobile structure PDB file.
+    chain : str
+        Chain ID to use for alignment (default: "A").
+    binding_site_residues : list[int] or None
+        If provided, restrict alignment and RMSD to Cα atoms of these residue
+        numbers only. If None, all Cα atoms on the chain are used.
 
     Returns
     -------
-    oechem.OEGraphMol
-        New aligned molecule.
     float
-        RMSD between `ref_mol` and `mobile_mol` after alignment.
+        Cα RMSD in Ångströms after superposition.
     """
-    chains_in_ref = find_component_chains(ref_mol, "protein", sort_by="size")
-    if ref_chain not in chains_in_ref or ref_chain is None:
+    ref_u = mda.Universe(str(ref_pdb))
+    mobile_u = mda.Universe(str(mobile_pdb))
+
+    if binding_site_residues is not None:
+        resid_sel = " or ".join(f"resid {r}" for r in binding_site_residues)
+        sel = f"protein and chainID {chain} and name CA and ({resid_sel})"
+    else:
+        sel = f"protein and chainID {chain} and name CA"
+
+    ref_atoms = ref_u.select_atoms(sel)
+    mobile_atoms = mobile_u.select_atoms(sel)
+
+    if len(ref_atoms) == 0:
         warnings.warn(
-            f"Chain {ref_chain} not found in reference molecule: chains {chains_in_ref}, using largest chain as reference {chains_in_ref[0]}"
+            f"No atoms selected in reference {ref_pdb.stem} with selection '{sel}'. "
+            f"Trying without chain filter."
         )
-        ref_chain = chains_in_ref[0]
+        fallback_sel = (
+            "protein and name CA"
+            if binding_site_residues is None
+            else (f"protein and name CA and ({resid_sel})")
+        )
+        ref_atoms = ref_u.select_atoms(fallback_sel)
+        mobile_atoms = mobile_u.select_atoms(fallback_sel)
 
-    chains_in_mobile = find_component_chains(mobile_mol, "protein", sort_by="size")
-    if mobile_chain not in chains_in_mobile or mobile_chain is None:
+    if len(ref_atoms) != len(mobile_atoms):
         warnings.warn(
-            f"Chain {mobile_chain} not found in mobile molecule: chains {chains_in_mobile}, using largest chain {chains_in_mobile[0]}"
+            f"Atom count mismatch between {ref_pdb.stem} ({len(ref_atoms)}) "
+            f"and {mobile_pdb.stem} ({len(mobile_atoms)}). RMSD may be unreliable."
         )
-        mobile_chain = chains_in_mobile[0]
+        # trim to the smaller set by matching residue IDs present in both
+        ref_resids = set(ref_atoms.resids)
+        mob_resids = set(mobile_atoms.resids)
+        common = sorted(ref_resids & mob_resids)
+        resid_filter = " or ".join(f"resid {r}" for r in common)
+        ref_atoms = ref_u.select_atoms(f"({sel}) and ({resid_filter})")
+        mobile_atoms = mobile_u.select_atoms(f"({sel}) and ({resid_filter})")
 
-    if ref_chain != mobile_chain:
-        warnings.warn(
-            f"Chains {ref_chain} and {mobile_chain} are not the same, this may not be what you want"
-        )
-    ref_pred = oechem.OEHasChainID(ref_chain)
-    mobile_pred = oechem.OEHasChainID(mobile_chain)
+    return float(rmsd(ref_atoms.positions, mobile_atoms.positions, superposition=True))
 
-    if binding_site is not None:
-        # Build an OEOrAtom predicate that matches any of the binding site residue numbers
-        residues = binding_site.residues
-        res_pred = oechem.OEHasResidueNumber(residues[0])
-        for res_num in residues[1:]:
-            res_pred = oechem.OEOrAtom(res_pred, oechem.OEHasResidueNumber(res_num))
-        # AND the residue predicate with the chain predicate so we only use
-        # binding-site atoms on the correct chain for each structure
-        ref_pred = oechem.OEAndAtom(ref_pred, res_pred)
-        mobile_pred = oechem.OEAndAtom(mobile_pred, res_pred)
 
-    # Create object to store results
-    aln_res = oespruce.OESuperposeResults()
-
-    # Set up superposing object and set reference molecule
-    superpos = oespruce.OESuperpose()
-    superpos.SetupRef(ref_mol, ref_pred)
-
-    # Perform superposing
-    superpos.Superpose(aln_res, mobile_mol, mobile_pred)
-    # print(f"RMSD: {aln_res.GetRMSD()}")
-
-    # Create copy of molecule and transform it to the aligned position
-    mobile_mol_aligned = mobile_mol.CreateCopy()
-    aln_res.Transform(mobile_mol_aligned)
-    return mobile_mol_aligned, aln_res.GetRMSD()
+def _find_pdb(subdir: Path) -> Path | None:
+    """Return the single PDB file in a cache subdirectory, or None."""
+    pdbs = list(subdir.glob("*.pdb"))
+    if len(pdbs) == 1:
+        return pdbs[0]
+    warnings.warn(f"Expected 1 PDB in {subdir}, found {len(pdbs)} — skipping.")
+    return None
 
 
 @click.command("calculate_protein_RMSD")
@@ -144,10 +144,16 @@ def superpose_molecule(
     "--binding_site",
     is_flag=True,
     default=False,
-    help="Use binding site residues for alignment",
+    help="Restrict alignment and RMSD to binding-site Cα atoms only",
 )
-def main(ref_dir, mobile_dir, cache_dir, output_csv, binding_site):
-    """Calculate RMSD between a reference structure and one or more mobile structures.
+@click.option(
+    "--chain",
+    default="A",
+    show_default=True,
+    help="Chain ID to use for alignment",
+)
+def main(ref_dir, mobile_dir, cache_dir, output_csv, binding_site, chain):
+    """Calculate pairwise protein Cα RMSD using MDAnalysis.
 
     Provide either --mobile_dir for a single pairwise calculation, or --cache_dir to
     compare the reference against all structure subdirectories in the cache.
@@ -159,41 +165,45 @@ def main(ref_dir, mobile_dir, cache_dir, output_csv, binding_site):
     if mobile_dir is not None and cache_dir is not None:
         raise click.UsageError("Provide either --mobile_dir or --cache_dir, not both.")
 
-    bs = None
-    if binding_site:
-        binding_site_residues = (
-            pockets["P1"] + pockets["P1_prime"] + pockets["P2"] + pockets["P3_4_5"]
-        )
-        bs = BindingSite(residues=binding_site_residues)
+    bs_residues = BINDING_SITE_RESIDUES if binding_site else None
 
-    # Load the reference structure
-    ref_complexes = MetaStructureFactory(structure_dir=ref_dir).load()
-    if len(ref_complexes) != 1:
-        raise ValueError(
-            f"Expected exactly 1 structure in --ref_dir, found {len(ref_complexes)}"
-        )
-    ref_complex = ref_complexes[0]
-    ref_id = ref_complex.target.target_name
-    ref_mol = ref_complex.target.to_oemol()
+    # Resolve the reference PDB and ID from the ref subdir
+    ref_pdb = _find_pdb(Path(ref_dir))
+    if ref_pdb is None:
+        raise click.UsageError(f"Could not find a PDB file in --ref_dir {ref_dir}")
+    ref_id = ref_pdb.stem
 
-    # Load mobile structures
-    mobile_dir_path = mobile_dir if mobile_dir is not None else cache_dir
-    mobile_complexes = MetaStructureFactory(
-        structure_dir=mobile_dir_path, fragalysis_dir=None, pdb_file=None
-    ).load()
-
-    # Exclude self
-    mobile_complexes = [c for c in mobile_complexes if c.target.target_name != ref_id]
+    # Collect (mobile_id, mobile_pdb) pairs
+    if mobile_dir is not None:
+        mobile_pdb = _find_pdb(Path(mobile_dir))
+        if mobile_pdb is None:
+            raise click.UsageError(
+                f"Could not find a PDB file in --mobile_dir {mobile_dir}"
+            )
+        mobile_pairs = [(mobile_pdb.stem, mobile_pdb)]
+    else:
+        mobile_pairs = []
+        for subdir in sorted(Path(cache_dir).iterdir()):
+            if not subdir.is_dir():
+                continue
+            pdb = _find_pdb(subdir)
+            if pdb is None or pdb.stem == ref_id:
+                continue
+            mobile_pairs.append((pdb.stem, pdb))
 
     rows = []
-    for mobile in mobile_complexes:
-        mobile_id = mobile.target.target_name
-        _, rmsd = superpose_molecule(ref_mol, mobile.target.to_oemol(), binding_site=bs)
+    for mobile_id, mobile_pdb in mobile_pairs:
+        r = calculate_rmsd(
+            ref_pdb=ref_pdb,
+            mobile_pdb=mobile_pdb,
+            chain=chain,
+            binding_site_residues=bs_residues,
+        )
         rows.append(
             ProteinRMSD.from_superposition(
                 ref_id=ref_id,
                 mobile_id=mobile_id,
-                rmsd=rmsd,
+                rmsd=r,
                 binding_site_only=binding_site,
             )
         )
