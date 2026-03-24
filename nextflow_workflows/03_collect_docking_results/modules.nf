@@ -12,7 +12,7 @@ process CALCULATE_RMSD{
 
     script:
     """
-    python3 "${params.scripts}"/calculate_rmsd_from_docking_results.py \
+    python3 "${projectDir}/scripts"/calculate_rmsd_from_docking_results.py \
     -d "${docked_dir}" \
     -l "${ligand_file_3d}" \
     -o "${name}_${uuid}_rmsd_results.csv"
@@ -34,7 +34,7 @@ process COMBINE_AND_PROCESS_RESULTS {
 
     script:
     """
-    python3 "${params.scripts}"/combine_and_process_results.py \
+    python3 "${projectDir}/scripts"/combine_and_process_results.py \
     ${dockedLigandRMSDs.join(' ')} \
     --tc-data "${params.chemicalSimilarityData}/tanimoto_combo/tanimoto_combo.csv" \
     --ecfp-data "${params.chemicalSimilarityData}/ecfp_tanimoto/fingerprint_similarities.csv" \
@@ -69,7 +69,7 @@ process CONVERT_TO_DOCKING_DATA_MODEL {
 
     script:
     """
-    python3 "${params.scripts}"/convert_to_docking_data_model.py \
+    python3 "${projectDir}/scripts"/convert_to_docking_data_model.py \
     --input-csv ${input_csv} \
     --output-file-prefix "${method}"_combined_results \
     """
