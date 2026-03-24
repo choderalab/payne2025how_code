@@ -73,11 +73,14 @@ workflow PROTEIN_RMSD_ANALYSIS {
         .combine(cache_dir)   // attach the single cache_dir value to every ref
 
     // Full chain-A RMSD
-    full_csvs = CALCULATE_PROTEIN_RMSD_FULL(ref_inputs).protein_rmsd_full.collect()
-    COMBINE_PROTEIN_RMSD_DATA(Channel.value("full"), full_csvs)
+    full_csvs = CALCULATE_PROTEIN_RMSD_FULL(ref_inputs).protein_rmsd_full
 
     // Binding-site-only RMSD
-    bs_csvs = CALCULATE_PROTEIN_RMSD_BINDING_SITE(ref_inputs).protein_rmsd_binding_site.collect()
-    COMBINE_PROTEIN_RMSD_DATA(Channel.value("binding_site"), bs_csvs)
+    bs_csvs = CALCULATE_PROTEIN_RMSD_BINDING_SITE(ref_inputs).protein_rmsd_binding_site
+
+    // Combine all per-ref CSVs (full + binding-site) into one output.
+    // The Binding_Site_Only column in each row distinguishes the two modes.
+    all_csvs = full_csvs.mix(bs_csvs).collect()
+    COMBINE_PROTEIN_RMSD_DATA(all_csvs)
 }
 

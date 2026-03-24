@@ -121,19 +121,18 @@ process CALCULATE_PROTEIN_RMSD_BINDING_SITE {
 process COMBINE_PROTEIN_RMSD_DATA {
     publishDir "${params.proteinRmsdData}", mode: 'copy', overwrite: true
     conda "${params.asap}"
-    tag "combine-protein-rmsd-${label}"
+    tag "combine-protein-rmsd-data"
 
     input:
-    val label
     path csv_files
 
     output:
-    path "combined_protein_rmsd_${label}.csv", emit: combined_protein_rmsd
+    path "combined_protein_rmsd.csv", emit: combined_protein_rmsd
 
     script:
     """
-    head -n 1 \$(ls *.csv | head -1) > combined_protein_rmsd_${label}.csv
-    for f in *.csv; do tail -n +2 "\$f" >> combined_protein_rmsd_${label}.csv; done
+    head -n 1 \$(ls *.csv | head -1) > combined_protein_rmsd.csv
+    for f in *.csv; do tail -n +2 "\$f" >> combined_protein_rmsd.csv; done
     """
 }
 process RUN_BEMIS_MURCKO_CLUSTERING {

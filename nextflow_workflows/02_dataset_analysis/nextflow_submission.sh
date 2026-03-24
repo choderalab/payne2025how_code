@@ -11,4 +11,4 @@
 
 source ~/.bashrc
 source ~/.nextflowrc
-nextflow 00_dataset_analysis.nf -entry PROTEIN_RMSD_ANALYSIS -resume
+nextflow 00_dataset_analysis.nf -entry PROTEIN_RMSD_ANALYSIS -c ../nextflow.config -resume
