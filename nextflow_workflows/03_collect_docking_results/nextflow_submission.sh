@@ -11,4 +11,4 @@
 
 source ~/.bashrc
 source ~/.nextflowrc
-nextflow 00_collect_docking_results.nf ../nextflow.config -resume
+nextflow 00_collect_docking_results.nf -entry process_results -c ../nextflow.config -resume
