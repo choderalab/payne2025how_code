@@ -93,29 +93,12 @@ def calculate_rmsd(
     ref_atoms = ref_u.select_atoms(sel)
     mobile_atoms = mobile_u.select_atoms(sel)
 
-    if len(ref_atoms) == 0:
-        warnings.warn(
-            f"No atoms selected in reference {ref_pdb.stem} with selection '{sel}'. "
-            f"Trying without chain filter."
-        )
-        fallback_sel = (
-            base_sel
-            if resid_sel is None
-            else f"({base_sel}) and ({resid_sel})"
-        )
-        ref_atoms = ref_u.select_atoms(fallback_sel)
-        mobile_atoms = mobile_u.select_atoms(fallback_sel)
+    # Ensure we only compare atoms that are present in both structures (e.g. if one has missing residues)
+    common = sorted(set(a for a in ref_atoms) & set(a for a in mobile_atoms))
+    common_atom_ids = [str(a.id) for a in common]
 
-    if len(ref_atoms) != len(mobile_atoms):
-        warnings.warn(
-            f"Atom count mismatch between {ref_pdb.stem} ({len(ref_atoms)}) "
-            f"and {mobile_pdb.stem} ({len(mobile_atoms)}). RMSD may be unreliable."
-        )
-        # trim to residue IDs present in both
-        common = sorted(set(ref_atoms.resids) & set(mobile_atoms.resids))
-        resid_filter = " or ".join(f"resid {r}" for r in common)
-        ref_atoms = ref_u.select_atoms(f"({sel}) and ({resid_filter})")
-        mobile_atoms = mobile_u.select_atoms(f"({sel}) and ({resid_filter})")
+    ref_atoms = ref_u.select_atoms(f"id {' '.join(common_atom_ids)}")
+    mobile_atoms = mobile_u.select_atoms(f"id {' '.join(common_atom_ids)}")
 
     return float(rmsd(ref_atoms.positions, mobile_atoms.positions, superposition=True))
 
