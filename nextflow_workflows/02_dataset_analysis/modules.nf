@@ -79,6 +79,63 @@ process COMBINE_CHEMICAL_SIMILARITY_DATA {
     python3 "${params.scripts}/combine_chemical_similarity_data.py" ${csv_files.join(' ')}
     """
 }
+process CALCULATE_PROTEIN_RMSD_FULL {
+    publishDir "${params.proteinRmsdData}/full_protein", mode: 'copy', overwrite: true
+    conda "${params.drugforge}"
+    tag "full|${ref_id}"
+
+    input:
+    tuple val(ref_id), path(ref_json), path(cache_dir)
+
+    output:
+    path("protein_rmsd_full_${ref_id}.csv"), emit: protein_rmsd_full
+
+    script:
+    """
+    python3 "${params.scripts}"/calculate_protein_RMSD.py \
+        --ref_json "${ref_json}" \
+        --cache_dir "${cache_dir}" \
+        --output_csv "protein_rmsd_full_${ref_id}.csv"
+    """
+}
+process CALCULATE_PROTEIN_RMSD_BINDING_SITE {
+    publishDir "${params.proteinRmsdData}/binding_site", mode: 'copy', overwrite: true
+    conda "${params.drugforge}"
+    tag "binding_site|${ref_id}"
+
+    input:
+    tuple val(ref_id), path(ref_json), path(cache_dir)
+
+    output:
+    path("protein_rmsd_binding_site_${ref_id}.csv"), emit: protein_rmsd_binding_site
+
+    script:
+    """
+    python3 "${params.scripts}"/calculate_protein_RMSD.py \
+        --ref_json "${ref_json}" \
+        --cache_dir "${cache_dir}" \
+        --binding_site \
+        --output_csv "protein_rmsd_binding_site_${ref_id}.csv"
+    """
+}
+process COMBINE_PROTEIN_RMSD_DATA {
+    publishDir "${params.proteinRmsdData}", mode: 'copy', overwrite: true
+    conda "${params.asap}"
+    tag "combine-protein-rmsd-${label}"
+
+    input:
+    val label
+    path csv_files
+
+    output:
+    path "combined_protein_rmsd_${label}.csv", emit: combined_protein_rmsd
+
+    script:
+    """
+    head -n 1 \$(ls *.csv | head -1) > combined_protein_rmsd_${label}.csv
+    for f in *.csv; do tail -n +2 "\$f" >> combined_protein_rmsd_${label}.csv; done
+    """
+}
 process RUN_BEMIS_MURCKO_CLUSTERING {
     publishDir "${params.chemicalSimilarityData}", mode: 'copy', overwrite: true
     conda "${params.asap}"

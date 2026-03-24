@@ -1,38 +1,52 @@
-import MDAnalysis as mda
-import numpy as np
+from pathlib import Path
 from pydantic import BaseModel, Field
 from drugforge.modeling.modeling import superpose_molecule
-from drugforge.data.schema.target import Target
 from drugforge.modeling.schema import PreppedComplex
 from drugforge.modeling.modeling import find_component_chains
 from drugforge.data.backend.openeye import oechem, oespruce
 import warnings
 import click
 
+from protein_rmsd_schema import ProteinRMSD
+
 # Define pocket residues
 pockets = {
     "P1": [142, 141, 140, 172, 163, 143, 144],
-    "P1_prime": [25,26,27],
-    "P2": [41,49,54],
-    "P3_4_5": [189, 190, 191, 192, 168, 167, 166, 165]
+    "P1_prime": [25, 26, 27],
+    "P2": [41, 49, 54],
+    "P3_4_5": [189, 190, 191, 192, 168, 167, 166, 165],
 }
+
 
 class BindingSite(BaseModel):
     """
     BindingSite
     """
-    residues: list[int] = Field(..., description="List of residue numbers to use for alignment")
+
+    residues: list[int] = Field(
+        ..., description="List of residue numbers to use for alignment"
+    )
+
 
 class AlignParams(BaseModel):
     """
     AlignParams
     """
-    align: bool = Field(False, description="Whether to align the structures before calculating RMSD")
+
+    align: bool = Field(
+        False, description="Whether to align the structures before calculating RMSD"
+    )
     ref_chain: str = Field("A", description="Chain to use for reference structure")
     mobile_chain: str = Field("A", description="Chain to use for mobile structure")
 
 
-def superpose_molecule(ref_mol, mobile_mol, ref_chain="A", mobile_chain="A", binding_site: BindingSite = None):
+def superpose_molecule(
+    ref_mol,
+    mobile_mol,
+    ref_chain="A",
+    mobile_chain="A",
+    binding_site: BindingSite = None,
+):
     """
     Superpose `mobile_mol` onto `ref_mol`.
 
@@ -101,24 +115,88 @@ def superpose_molecule(ref_mol, mobile_mol, ref_chain="A", mobile_chain="A", bin
     aln_res.Transform(mobile_mol_aligned)
     return mobile_mol_aligned, aln_res.GetRMSD()
 
+
 @click.command("calculate_protein_RMSD")
-@click.option("--ref_json", type=click.Path(exists=True), required=True, help="Path to reference json file")
-@click.option("--mobile_json", type=click.Path(exists=True), required=True, help="Path to mobile json file")
-@click.option("--binding_site", is_flag=True, default=False, help="Use binding site residues for alignment")
-def main(ref_json, mobile_json, binding_site):
-    """Calculate RMSD between two protein structures, optionally using only binding site residues for alignment."""
-    ref = PreppedComplex.from_json_file(ref_json)
-    mobile = PreppedComplex.from_json_file(mobile_json)
+@click.option(
+    "--ref_json",
+    type=click.Path(exists=True),
+    required=True,
+    help="Path to reference PreppedComplex JSON file",
+)
+@click.option(
+    "--mobile_json",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a single mobile PreppedComplex JSON file",
+)
+@click.option(
+    "--cache_dir",
+    type=click.Path(exists=True, file_okay=False),
+    default=None,
+    help="Directory of PreppedComplex JSON files to compare against the reference",
+)
+@click.option(
+    "--output_csv",
+    type=click.Path(),
+    required=True,
+    help="Path to output CSV file (columns: ref_id, mobile_id, rmsd)",
+)
+@click.option(
+    "--binding_site",
+    is_flag=True,
+    default=False,
+    help="Use binding site residues for alignment",
+)
+def main(ref_json, mobile_json, cache_dir, output_csv, binding_site):
+    """Calculate RMSD between a reference structure and one or more mobile structures.
 
+    Provide either --mobile_json for a single pairwise calculation, or --cache_dir to
+    compare the reference against every JSON file found in that directory.
+    Results are written to --output_csv with columns: ref_id, mobile_id, rmsd.
+    """
+    if mobile_json is None and cache_dir is None:
+        raise click.UsageError("Provide either --mobile_json or --cache_dir.")
+    if mobile_json is not None and cache_dir is not None:
+        raise click.UsageError("Provide either --mobile_json or --cache_dir, not both.")
+
+    bs = None
     if binding_site:
-        binding_site_residues = pockets["P1"] + pockets["P1_prime"] + pockets["P2"] + pockets["P3_4_5"]
-        binding_site = BindingSite(residues=binding_site_residues)
-    else:
-        binding_site = None
+        binding_site_residues = (
+            pockets["P1"] + pockets["P1_prime"] + pockets["P2"] + pockets["P3_4_5"]
+        )
+        bs = BindingSite(residues=binding_site_residues)
 
-    _, rmsd = superpose_molecule(ref.target.to_oemol(), mobile.target.to_oemol(), binding_site=binding_site)
-    _, rmsd = superpose_molecule(ref.target.to_oemol(), mobile.target.to_oemol(), binding_site=binding_site)
-    print(f"RMSD: {rmsd:.2f} Å")
+    ref = PreppedComplex.from_json_file(ref_json)
+    ref_mol = ref.target.to_oemol()
+    ref_id = Path(ref_json).stem
+
+    # Build list of (mobile_id, mobile_json_path) to process
+    if mobile_json is not None:
+        mobile_files = [(Path(mobile_json).stem, Path(mobile_json))]
+    else:
+        mobile_files = [
+            (p.stem, p)
+            for p in sorted(Path(cache_dir).glob("**/*.json"))
+            if p.stem != ref_id
+        ]
+
+    rows = []
+    for mobile_id, mobile_path in mobile_files:
+        mobile = PreppedComplex.from_json_file(str(mobile_path))
+        _, rmsd = superpose_molecule(ref_mol, mobile.target.to_oemol(), binding_site=bs)
+        rows.append(
+            ProteinRMSD.from_superposition(
+                ref_id=ref_id,
+                mobile_id=mobile_id,
+                rmsd=rmsd,
+                binding_site_only=binding_site,
+            )
+        )
+
+    output_path = Path(output_csv)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    ProteinRMSD.construct_dataframe(rows).to_csv(output_path, index=False)
+
 
 if __name__ == "__main__":
     main()

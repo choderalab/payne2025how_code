@@ -6,6 +6,9 @@ include {
     CALCULATE_TANIMOTO_COMBO
     COMBINE_CHEMICAL_SIMILARITY_DATA
     RUN_BEMIS_MURCKO_CLUSTERING
+    CALCULATE_PROTEIN_RMSD_FULL
+    CALCULATE_PROTEIN_RMSD_BINDING_SITE
+    COMBINE_PROTEIN_RMSD_DATA
 } from "./modules.nf"
 
 workflow {
@@ -55,3 +58,26 @@ workflow COMBINE_SIMILARITY_DATA {
     csv_files = Channel.fromPath("${params.chemicalSimilarityData}/*/*.csv").collect()
     COMBINE_CHEMICAL_SIMILARITY_DATA(csv_files)
 }
+
+// Entry point: Calculate pairwise protein RMSD for all structures in the fragalysis cache.
+// One job is launched per reference structure; each job compares that ref against the
+// entire cache directory (--cache_dir), so Nextflow fans out N jobs (one per structure)
+// rather than N² jobs.  Both full chain-A and binding-site RMSD are run in parallel.
+workflow PROTEIN_RMSD_ANALYSIS {
+    cache_dir = Channel.fromPath("${params.fixedFragalysisCachePath}", type: 'dir')
+
+    // One channel item per reference JSON: (ref_id, ref_json, cache_dir)
+    ref_inputs = Channel
+        .fromPath("${params.fixedFragalysisCachePath}/**/*.json")
+        .map { f -> tuple(f.baseName, f) }
+        .combine(cache_dir)   // attach the single cache_dir value to every ref
+
+    // Full chain-A RMSD
+    full_csvs = CALCULATE_PROTEIN_RMSD_FULL(ref_inputs).protein_rmsd_full.collect()
+    COMBINE_PROTEIN_RMSD_DATA(Channel.value("full"), full_csvs)
+
+    // Binding-site-only RMSD
+    bs_csvs = CALCULATE_PROTEIN_RMSD_BINDING_SITE(ref_inputs).protein_rmsd_binding_site.collect()
+    COMBINE_PROTEIN_RMSD_DATA(Channel.value("binding_site"), bs_csvs)
+}
+
