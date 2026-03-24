@@ -92,7 +92,7 @@ process CALCULATE_PROTEIN_RMSD_FULL {
 
     script:
     """
-    python3 "${params.scripts}"/calculate_protein_RMSD.py \
+    python3 "${projectDir}/scripts"/calculate_protein_RMSD.py \
         --ref_json "${ref_json}" \
         --cache_dir "cache_dir" \
         --output_csv "protein_rmsd_full_${ref_id}.csv"
@@ -111,7 +111,7 @@ process CALCULATE_PROTEIN_RMSD_BINDING_SITE {
 
     script:
     """
-    python3 "${params.scripts}"/calculate_protein_RMSD.py \
+    python3 "${projectDir}/scripts"/calculate_protein_RMSD.py \
         --ref_json "${ref_json}" \
         --cache_dir "cache_dir" \
         --binding_site \
