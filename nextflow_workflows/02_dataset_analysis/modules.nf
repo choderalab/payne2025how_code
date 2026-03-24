@@ -85,7 +85,7 @@ process CALCULATE_PROTEIN_RMSD_FULL {
     tag "full|${ref_id}"
 
     input:
-    tuple val(ref_id), path(ref_pdb), path(cache_dir, stageAs: 'cache_dir')
+    tuple val(ref_id), path(ref_dir, stageAs: 'ref_dir'), path(cache_dir, stageAs: 'cache_dir')
 
     output:
     path("protein_rmsd_full_${ref_id}.csv"), emit: protein_rmsd_full
@@ -93,7 +93,7 @@ process CALCULATE_PROTEIN_RMSD_FULL {
     script:
     """
     python3 "${projectDir}/scripts"/calculate_protein_RMSD.py \
-        --ref_pdb "${ref_pdb}" \
+        --ref_dir "ref_dir" \
         --cache_dir "cache_dir" \
         --output_csv "protein_rmsd_full_${ref_id}.csv"
     """
@@ -104,7 +104,7 @@ process CALCULATE_PROTEIN_RMSD_BINDING_SITE {
     tag "binding_site|${ref_id}"
 
     input:
-    tuple val(ref_id), path(ref_pdb), path(cache_dir, stageAs: 'cache_dir')
+    tuple val(ref_id), path(ref_dir, stageAs: 'ref_dir'), path(cache_dir, stageAs: 'cache_dir')
 
     output:
     path("protein_rmsd_binding_site_${ref_id}.csv"), emit: protein_rmsd_binding_site
@@ -112,7 +112,7 @@ process CALCULATE_PROTEIN_RMSD_BINDING_SITE {
     script:
     """
     python3 "${projectDir}/scripts"/calculate_protein_RMSD.py \
-        --ref_pdb "${ref_pdb}" \
+        --ref_dir "ref_dir" \
         --cache_dir "cache_dir" \
         --binding_site \
         --output_csv "protein_rmsd_binding_site_${ref_id}.csv"

@@ -66,11 +66,16 @@ workflow COMBINE_SIMILARITY_DATA {
 workflow PROTEIN_RMSD_ANALYSIS {
     cache_dir = Channel.fromPath("${params.fixedFragalysisCachePath}", type: 'dir')
 
-    // One channel item per reference PDB: (ref_id, ref_pdb, cache_dir)
+    // One channel item per reference structure: (ref_id, ref_subdir, cache_dir)
+    // Each subdirectory under the cache is passed as --ref_dir; MetaStructureFactory
+    // loads the PDB and SDF from it automatically. ref_id is taken from the PDB stem.
     ref_inputs = Channel
-        .fromPath("${params.fixedFragalysisCachePath}/**/*.pdb")
-        .map { f -> tuple(f.baseName, f) }
-        .combine(cache_dir)   // attach the single cache_dir value to every ref
+        .fromPath("${params.fixedFragalysisCachePath}/*", type: 'dir')
+        .map { subdir ->
+            def pdb = subdir.listFiles().find { it.name.endsWith('.pdb') }
+            tuple(pdb.baseName, subdir)
+        }
+        .combine(cache_dir)
 
     // Full chain-A RMSD
     full_csvs = CALCULATE_PROTEIN_RMSD_FULL(ref_inputs).protein_rmsd_full
