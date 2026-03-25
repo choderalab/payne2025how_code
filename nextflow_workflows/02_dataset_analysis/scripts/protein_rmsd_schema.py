@@ -25,7 +25,10 @@ class ProteinRMSD(BaseModel):
         ..., description="ID of the query (mobile) protein structure"
     )
     RMSD: float = Field(
-        ..., ge=0, description="Cα RMSD in Ångströms after superposition"
+        ..., ge=0, description="Protein RMSD in Ångströms after superposition (atom type given by Atom_Selection)"
+    )
+    N_Atoms: int = Field(
+        ..., gt=0, description="Number of atoms used in the superposition and RMSD calculation"
     )
     Binding_Site_Only: bool = Field(
         False,
@@ -63,14 +66,16 @@ class ProteinRMSD(BaseModel):
         ref_id: str,
         mobile_id: str,
         rmsd: float,
+        n_atoms: int,
         binding_site_only: bool,
         atom_selection: AtomSelection = AtomSelection.heavy_atom,
     ) -> "ProteinRMSD":
-        """Convenience constructor that accepts the raw outputs of superpose_molecule."""
+        """Convenience constructor that accepts the raw outputs of calculate_rmsd."""
         return cls(
             Reference_Structure=ref_id,
             Query_Structure=mobile_id,
             RMSD=round(rmsd, 4),
+            N_Atoms=n_atoms,
             Binding_Site_Only=binding_site_only,
             Atom_Selection=atom_selection,
         )

@@ -93,14 +93,27 @@ def calculate_rmsd(
     ref_atoms = ref_u.select_atoms(sel)
     mobile_atoms = mobile_u.select_atoms(sel)
 
-    # Ensure we only compare atoms that are present in both structures (e.g. if one has missing residues)
-    common = sorted(set(a for a in ref_atoms) & set(a for a in mobile_atoms))
-    common_atom_ids = [str(a.id) for a in common]
+    # Ensure we only compare atoms present in both structures (e.g. missing residues).
+    # Match by (resid, resname, atom name) — atom indices are universe-local and
+    # cannot be compared across different Universe objects.
+    ref_key_to_id = {(a.resid, a.resname, a.name): str(a.id) for a in ref_atoms}
+    mobile_key_to_id = {(a.resid, a.resname, a.name): str(a.id) for a in mobile_atoms}
+    common_keys = set(ref_key_to_id) & set(mobile_key_to_id)
 
-    ref_atoms = ref_u.select_atoms(f"id {' '.join(common_atom_ids)}")
-    mobile_atoms = mobile_u.select_atoms(f"id {' '.join(common_atom_ids)}")
+    if not common_keys:
+        raise ValueError(
+            f"No common atoms found between {ref_pdb} and {mobile_pdb} "
+            f"with selection '{sel}'. Check chain ID and atom selection."
+        )
 
-    return float(rmsd(ref_atoms.positions, mobile_atoms.positions, superposition=True))
+    ref_ids = [ref_key_to_id[k] for k in sorted(common_keys)]
+    mobile_ids = [mobile_key_to_id[k] for k in sorted(common_keys)]
+
+    ref_atoms = ref_u.select_atoms(f"id {' '.join(ref_ids)}")
+    mobile_atoms = mobile_u.select_atoms(f"id {' '.join(mobile_ids)}")
+
+    n_atoms = len(ref_ids)
+    return float(rmsd(ref_atoms.positions, mobile_atoms.positions, superposition=True)), n_atoms
 
 
 def _find_pdb(subdir: Path) -> Path | None:
@@ -108,7 +121,8 @@ def _find_pdb(subdir: Path) -> Path | None:
     pdbs = list(subdir.glob("*.pdb"))
     if len(pdbs) == 1:
         return pdbs[0]
-    warnings.warn(f"Expected 1 PDB in {subdir}, found {len(pdbs)} — skipping.")
+    if len(pdbs) != 0:
+        warnings.warn(f"Expected 1 PDB in {subdir}, found {len(pdbs)} — skipping.")
     return None
 
 
@@ -141,7 +155,7 @@ def _find_pdb(subdir: Path) -> Path | None:
     "--binding_site",
     is_flag=True,
     default=False,
-    help="Restrict alignment and RMSD to binding-site Cα atoms only",
+    help="Restrict alignment and RMSD to binding-site residues only (atom type controlled by --atom_selection)",
 )
 @click.option(
     "--chain",
@@ -200,7 +214,7 @@ def main(
 
     rows = []
     for mobile_id, mobile_pdb in mobile_pairs:
-        r = calculate_rmsd(
+        r, n_atoms = calculate_rmsd(
             ref_pdb=ref_pdb,
             mobile_pdb=mobile_pdb,
             chain=chain,
@@ -212,6 +226,7 @@ def main(
                 ref_id=ref_id,
                 mobile_id=mobile_id,
                 rmsd=r,
+                n_atoms=n_atoms,
                 binding_site_only=binding_site,
                 atom_selection=atom_sel,
             )
