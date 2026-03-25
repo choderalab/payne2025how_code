@@ -49,7 +49,7 @@ def calculate_rmsd(
     chain: str = "A",
     binding_site_residues: list[int] | None = None,
     atom_selection: AtomSelection = AtomSelection.heavy_atom,
-) -> float:
+) -> tuple[float, int]:
     """
     Calculate the protein RMSD between two structures after superposition.
 
