@@ -1,6 +1,7 @@
 #!/usr/bin/env nextflow
 include {
     CREATE_EVALUATOR_FACTORY_SETTINGS
+    CREATE_EVALUATOR_FACTORY_SETTINGS_CUTOFF
     CREATE_EVALUATORS
     RUN_EVALUATORS
     RUN_EVALUATORS_LIGHTWEIGHT
@@ -203,6 +204,66 @@ workflow POSIT_MULTIPOSE_ANALYSIS {
         all_results
     )
 }
+// ── RMSD cutoff sensitivity workflows (R3.7) ────────────────────────────────
+// Re-run the core POSIT analyses at 1.5 Å and 2.5 Å success thresholds.
+// Settings files are generated with _rmsd1.5 / _rmsd2.5 name suffixes so they
+// sit alongside the existing 2.0 Å configs in params.evaluator_configs.
+
+def make_settings_map_for_cutoff(String cutoff_label) {
+    def suffix = "_rmsd${cutoff_label}"
+    return [
+        "datesplit"   : "${params.evaluator_configs}/reference_split_comparison${suffix}.yaml",
+        "x_to_x"      : "${params.evaluator_configs}/x_to_x_scaffold_split${suffix}.yaml",
+        "x_to_x_5"    : "${params.evaluator_configs}/x_to_x_scaffold_split_5_refs${suffix}.yaml",
+        "x_to_y"      : "${params.evaluator_configs}/x_to_y_scaffold_split${suffix}.yaml",
+        "x_to_y_5"    : "${params.evaluator_configs}/x_to_y_scaffold_split_5_refs${suffix}.yaml",
+        "x_to_not_x"  : "${params.evaluator_configs}/x_to_not_x_scaffold_split${suffix}.yaml",
+        "not_x_to_x"  : "${params.evaluator_configs}/not_x_to_x_scaffold_split${suffix}.yaml",
+        "not_x_to_x_5": "${params.evaluator_configs}/not_x_to_x_scaffold_split_5_refs${suffix}.yaml",
+        "ecfp4"        : "${params.evaluator_configs}/increasing_similarity_ecfp4${suffix}.yaml",
+        "mcs"          : "${params.evaluator_configs}/increasing_similarity_mcs${suffix}.yaml",
+        "tc"           : "${params.evaluator_configs}/increasing_similarity_tanimoto_combo_aligned${suffix}.yaml",
+    ]
+}
+
+workflow GENERATE_SETTINGS_RMSD_1P5 {
+    CREATE_EVALUATOR_FACTORY_SETTINGS_CUTOFF(Channel.value(1.5))
+}
+workflow GENERATE_SETTINGS_RMSD_2P5 {
+    CREATE_EVALUATOR_FACTORY_SETTINGS_CUTOFF(Channel.value(2.5))
+}
+
+workflow analyze_posit_rmsd_1p5 {
+    def s = make_settings_map_for_cutoff("1.5")
+    RUN_ANALYSIS(results.posit_single_pose, [label: "datesplit_rmsd1p5",    filename: s.datesplit])
+    RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_x_rmsd1p5",       filename: s.x_to_x])
+    RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_x_5_rmsd1p5",     filename: s.x_to_x_5])
+    RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_y_rmsd1p5",       filename: s.x_to_y])
+    RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_y_5_rmsd1p5",     filename: s.x_to_y_5])
+    RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_not_x_rmsd1p5",   filename: s.x_to_not_x])
+    RUN_ANALYSIS(results.posit_single_pose, [label: "not_x_to_x_rmsd1p5",   filename: s.not_x_to_x])
+    RUN_ANALYSIS(results.posit_single_pose, [label: "not_x_to_x_5_rmsd1p5", filename: s.not_x_to_x_5])
+    RUN_ANALYSIS(results.posit_single_pose, [label: "ecfp4_rmsd1p5",         filename: s.ecfp4])
+    RUN_ANALYSIS(results.posit_single_pose, [label: "mcs_rmsd1p5",           filename: s.mcs])
+    RUN_ANALYSIS(results.posit_single_pose, [label: "tc_rmsd1p5",            filename: s.tc])
+}
+
+workflow analyze_posit_rmsd_2p5 {
+    def s = make_settings_map_for_cutoff("2.5")
+    RUN_ANALYSIS(results.posit_single_pose, [label: "datesplit_rmsd2p5",    filename: s.datesplit])
+    RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_x_rmsd2p5",       filename: s.x_to_x])
+    RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_x_5_rmsd2p5",     filename: s.x_to_x_5])
+    RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_y_rmsd2p5",       filename: s.x_to_y])
+    RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_y_5_rmsd2p5",     filename: s.x_to_y_5])
+    RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_not_x_rmsd2p5",   filename: s.x_to_not_x])
+    RUN_ANALYSIS(results.posit_single_pose, [label: "not_x_to_x_rmsd2p5",   filename: s.not_x_to_x])
+    RUN_ANALYSIS(results.posit_single_pose, [label: "not_x_to_x_5_rmsd2p5", filename: s.not_x_to_x_5])
+    RUN_ANALYSIS(results.posit_single_pose, [label: "ecfp4_rmsd2p5",         filename: s.ecfp4])
+    RUN_ANALYSIS(results.posit_single_pose, [label: "mcs_rmsd2p5",           filename: s.mcs])
+    RUN_ANALYSIS(results.posit_single_pose, [label: "tc_rmsd2p5",            filename: s.tc])
+}
+// ── end RMSD cutoff sensitivity ──────────────────────────────────────────────
+
 workflow FRED_MULTIPOSE_ANALYSIS {
     name = "fred_multipose_analysis"
     CREATE_MULTIPOSE_EVALUATORS(name)

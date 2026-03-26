@@ -16,6 +16,28 @@ process CREATE_EVALUATOR_FACTORY_SETTINGS{
     """
 }
 
+process CREATE_EVALUATOR_FACTORY_SETTINGS_CUTOFF{
+    publishDir "${params.evaluator_configs}"
+    conda "${params.harbor}"
+    tag "create-evaluator-factory-settings-rmsd${rmsd_cutoff}"
+    cache false
+    memory { 4.GB }
+    time { 10.m }
+    label 'cpushort'
+
+    input:
+    val(rmsd_cutoff)
+
+    output:
+    path("*.yaml"), emit: evaluator_configs
+
+    script:
+    """
+    python3 "${params.scripts}"/create_evaluator_factory_settings.py \
+    --rmsd-cutoff "${rmsd_cutoff}"
+    """
+}
+
 process CREATE_EVALUATORS {
     publishDir "${params.evaluationResults}", mode: 'copy', overwrite: false
     conda "${params.harbor}"
