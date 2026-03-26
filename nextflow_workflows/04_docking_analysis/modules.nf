@@ -12,7 +12,7 @@ process CREATE_EVALUATOR_FACTORY_SETTINGS{
 
     script:
     """
-    python3 "${params.scripts}"/create_evaluator_factory_settings.py
+    python3 "${projectDir}/scripts"/create_evaluator_factory_settings.py
     """
 }
 
@@ -33,7 +33,7 @@ process CREATE_EVALUATOR_FACTORY_SETTINGS_CUTOFF{
 
     script:
     """
-    python3 "${params.scripts}"/create_evaluator_factory_settings.py \
+    python3 "${projectDir}/scripts"/create_evaluator_factory_settings.py \
     --rmsd-cutoff "${rmsd_cutoff}"
     """
 }
@@ -58,7 +58,7 @@ process CREATE_EVALUATORS {
 
     script:
     """
-    python3 "${params.scripts}"/create_evaluators.py \
+    python3 "${projectDir}/scripts"/create_evaluators.py \
     --input-parquet "${docking_results_parquet}" \
     --settings "${settings}" \
     --output "${name}" \
@@ -81,7 +81,7 @@ process CREATE_MULTIPOSE_EVALUATORS {
 
     script:
     """
-    python3 "${params.scripts}"/create_multipose_evaluators.py \
+    python3 "${projectDir}/scripts"/create_multipose_evaluators.py \
     --output "${name}" \
     """
 }
@@ -132,7 +132,7 @@ process RUN_EVALUATORS {
 
     script:
     """
-    python3 "${params.scripts}"/run_evaluators.py \
+    python3 "${projectDir}/scripts"/run_evaluators.py \
     evaluator_jsons_* \
     --input-parquet "${docking_results_parquet}" \
     --n-cpus 32
@@ -163,7 +163,7 @@ process RUN_EVALUATORS_LIGHTWEIGHT {
 
     script:
     """
-    python3 "${params.scripts}"/run_evaluators.py \
+    python3 "${projectDir}/scripts"/run_evaluators.py \
     evaluator_jsons_* \
     --input-parquet "${docking_results_parquet}" \
     --n-cpus 8

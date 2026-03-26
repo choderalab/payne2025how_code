@@ -13,9 +13,9 @@ source ~/.bashrc
 source ~/.nextflowrc
 
 # Step 1: generate evaluator factory settings for 1.5 and 2.5 Å cutoffs
-nextflow 04_docking_analysis_v2.nf -entry GENERATE_SETTINGS_RMSD_1P5 -c nextflow.config -resume
-nextflow 04_docking_analysis_v2.nf -entry GENERATE_SETTINGS_RMSD_2P5 -c nextflow.config -resume
+nextflow 04_docking_analysis_v2.nf -entry GENERATE_SETTINGS_RMSD_1P5 -c ../nextflow.config -c nextflow.config -resume
+nextflow 04_docking_analysis_v2.nf -entry GENERATE_SETTINGS_RMSD_2P5 -c ../nextflow.config -c nextflow.config -resume
 
 # Step 2: run the full POSIT analysis at each cutoff
-nextflow 04_docking_analysis_v2.nf -entry analyze_posit_rmsd_1p5 -c nextflow.config -resume
-nextflow 04_docking_analysis_v2.nf -entry analyze_posit_rmsd_2p5 -c nextflow.config -resume
+nextflow 04_docking_analysis_v2.nf -entry analyze_posit_rmsd_1p5 -c ../nextflow.config -c nextflow.config -resume
+nextflow 04_docking_analysis_v2.nf -entry analyze_posit_rmsd_2p5 -c ../nextflow.config -c nextflow.config -resume
