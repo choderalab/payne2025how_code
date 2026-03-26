@@ -21,7 +21,7 @@ def _():
 
 @app.cell
 def _(Path):
-    fig_path = Path("./20260324_protein_rmsd")
+    fig_path = Path("/Users/apayne/science/sars-cov-2-retro-paper-asap/plotting/20260324_protein_rmsd")
     fig_path.mkdir(parents=True, exist_ok=True)
 
     def save_fig(fig, filename, dpi=200, suffix=".pdf"):
@@ -95,6 +95,8 @@ def _(data_1, pd):
         .dropna(subset=["ProteinRMSDData_RMSD"])
         .query("ProteinRMSDData_Atom_Selection == 'heavy_atom'")
     )
+    rmsd_df = rmsd_df[rmsd_df["RefData_Scaffold_ID"] == rmsd_df["QueryData_Scaffold_ID"]]
+    rmsd_df["Query_Structure_Series"] = rmsd_df["Query_Structure"].apply(lambda x: x[5])
     # Deduplicate: one RMSD value per unique structure pair + RMSD type
     earliest_refs = (
         rmsd_df.sort_values("RefData_Date")
@@ -112,6 +114,18 @@ def _(data_1, pd):
 
 
 @app.cell
+def _():
+    max_rmsd_val = 2.1
+    return (max_rmsd_val,)
+
+
+@app.cell
+def _(rmsd_df):
+    rmsd_df
+    return
+
+
+@app.cell
 def _(sns):
     sns.set_style("white")
     palette = {"Full chain": "#4878d0", "Binding site only": "#ee854a"}
@@ -119,7 +133,7 @@ def _(sns):
 
 
 @app.cell
-def _(earliest_refs, palette, plt, rmsd_df, save_fig, sns):
+def _(earliest_refs, max_rmsd_val, palette, plt, rmsd_df, save_fig, sns):
     fig, axes = plt.subplots(2, 2, figsize=(10, 8), constrained_layout=True)
     fig.suptitle(
         "Protein RMSD to earliest reference structure (heavy atom)", fontsize=13
@@ -155,7 +169,7 @@ def _(earliest_refs, palette, plt, rmsd_df, save_fig, sns):
         _ax.set_title(f"Scaffold {_scaffold_id}\n(ref: {_ref_structure})", fontsize=10)
         _ax.set_xlabel("Protein RMSD (Å)")
         _ax.set_ylabel("Count")
-        _ax.set_xlim(0, 5)
+        _ax.set_xlim(0, max_rmsd_val)
         if _ax.get_legend():
             _ax.get_legend().remove()
     handles = [
@@ -229,7 +243,9 @@ def _(rmsd_df):
 
 
 @app.cell
-def _(earliest_refs, palette, plt, rmsd_df_dated, save_fig):
+def _(earliest_refs, max_rmsd_val, palette, plt, rmsd_df_dated, save_fig, sns):
+    marker_map = {"x": "o", "P": "^"}
+
     fig2, axes2 = plt.subplots(2, 2, figsize=(12, 8), constrained_layout=True)
     fig2.suptitle("Protein RMSD vs query structure date (heavy atom)", fontsize=13)
     for _ax, _scaffold_id in zip(axes2.flat, [1, 2, 3, 4]):
@@ -239,54 +255,106 @@ def _(earliest_refs, palette, plt, rmsd_df_dated, save_fig):
             & (rmsd_df_dated["RefData_Scaffold_ID"] == _scaffold_id)
             & (rmsd_df_dated["Reference_Structure"] == _ref_structure)
         ].dropna(subset=["Query_Date"])
-        for _scope, _color in palette.items():
-            s = _subset[_subset["Scope"] == _scope]
-            _ax.scatter(
-                s["Query_Date"],
-                s["ProteinRMSDData_RMSD"],
-                color=_color,
-                alpha=0.5,
-                s=12,
-                label=_scope,
-            )
+        sns.scatterplot(
+            data=_subset,
+            x="Query_Date",
+            y="ProteinRMSDData_RMSD",
+            hue="Scope",
+            style="Query_Structure_Series",
+            palette=palette,
+            markers=marker_map,
+            alpha=0.6,
+            s=20,
+            ax=_ax,
+            legend=False,
+        )
         _ax.set_title(f"Scaffold {_scaffold_id}\n(ref: {_ref_structure})", fontsize=10)
         _ax.set_xlabel("Query structure date")
         _ax.set_ylabel("Protein RMSD (Å)")
-        _ax.set_ylim(0, 5)
+        _ax.set_ylim(0, max_rmsd_val)
         _ax.tick_params(axis="x", rotation=30)
-        if _ax.get_legend():
-            _ax.get_legend().remove()
+
+    # Shared legend: colour = Scope, marker = Query_Structure_Series
     handles2 = [
-        plt.Line2D(
-            [0],
-            [0],
-            marker="o",
-            color="w",
-            markerfacecolor=palette["Full chain"],
-            markersize=8,
-            alpha=0.7,
-            label="Full chain",
-        ),
-        plt.Line2D(
-            [0],
-            [0],
-            marker="o",
-            color="w",
-            markerfacecolor=palette["Binding site only"],
-            markersize=8,
-            alpha=0.7,
-            label="Binding site only",
-        ),
+        plt.Line2D([0], [0], marker="o", color="w",
+                   markerfacecolor=palette["Full chain"], markersize=8, alpha=0.7,
+                   label="Full chain"),
+        plt.Line2D([0], [0], marker="o", color="w",
+                   markerfacecolor=palette["Binding site only"], markersize=8, alpha=0.7,
+                   label="Binding site only"),
+        plt.Line2D([0], [0], marker="o", color="grey", markersize=8, alpha=0.7,
+                   linestyle="None", label="Monoclinic (x-series)"),
+        plt.Line2D([0], [0], marker="^", color="grey", markersize=8, alpha=0.7,
+                   linestyle="None", label="Orthorhombic (p-series)"),
     ]
-    fig2.legend(
-        handles=handles2,
-        loc="lower center",
-        ncol=2,
-        bbox_to_anchor=(0.5, -0.04),
-        fontsize=9,
-    )
+    fig2.legend(handles=handles2, loc="lower center", ncol=4,
+                bbox_to_anchor=(0.5, -0.04), fontsize=9)
+
     save_fig(fig2, "protein_rmsd_vs_date_per_scaffold")
     plt.show()
+    return
+
+
+@app.cell
+def _(rmsd_df):
+    rmsd_df
+    return
+
+
+@app.cell
+def _():
+    return
+
+
+@app.cell
+def _():
+    return
+
+
+@app.cell
+def _(rmsd_df_dated):
+    high_rmsd = rmsd_df_dated[rmsd_df_dated["ProteinRMSDData_RMSD"] > 1.0].sort_values(
+        "ProteinRMSDData_RMSD", ascending=False
+    )
+    high_rmsd
+    return (high_rmsd,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Structures with Protein RMSD > 1 Å
+
+    - **Total entries:** {len(high_rmsd)}
+    - **Unique query structures:** {high_rmsd["Query_Structure"].nunique()}
+    - **Unique reference structures:** {high_rmsd["Reference_Structure"].nunique()}
+    - **Scaffolds represented:** {sorted(high_rmsd["QueryData_Scaffold_ID"].unique())}
+    - **RMSD range:** {high_rmsd["ProteinRMSDData_RMSD"].min():.2f} – {high_rmsd["ProteinRMSDData_RMSD"].max():.2f} Å
+    """)
+    return
+
+
+@app.cell
+def _(high_rmsd):
+    # Summary counts per scaffold and scope
+    high_rmsd_summary = (
+        high_rmsd.groupby(["QueryData_Scaffold_ID", "Scope"])
+        .agg(
+            count=("ProteinRMSDData_RMSD", "size"),
+            mean_rmsd=("ProteinRMSDData_RMSD", "mean"),
+            median_rmsd=("ProteinRMSDData_RMSD", "median"),
+            max_rmsd=("ProteinRMSDData_RMSD", "max"),
+        )
+        .reset_index()
+        .rename(columns={"QueryData_Scaffold_ID": "Scaffold"})
+        .sort_values(["Scaffold", "Scope"])
+    )
+    high_rmsd_summary
+    return
+
+
+@app.cell
+def _():
     return
 
 
