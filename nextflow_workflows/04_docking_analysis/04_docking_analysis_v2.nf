@@ -233,34 +233,60 @@ workflow GENERATE_SETTINGS_RMSD_2P5 {
     CREATE_EVALUATOR_FACTORY_SETTINGS_CUTOFF(Channel.value(2.5))
 }
 
+// 1.5 Å — individual workflows (DSL2 requires one process instance per workflow scope)
+def s1p5 = make_settings_map_for_cutoff("1.5")
+workflow DATESPLIT_POSIT_RMSD_1P5     { RUN_ANALYSIS(results.posit_single_pose, [label: "datesplit_rmsd1p5",    filename: s1p5.datesplit]) }
+workflow X_TO_X_POSIT_RMSD_1P5        { RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_x_rmsd1p5",       filename: s1p5.x_to_x]) }
+workflow X_TO_X_5_POSIT_RMSD_1P5      { RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_x_5_rmsd1p5",     filename: s1p5.x_to_x_5]) }
+workflow X_TO_Y_POSIT_RMSD_1P5        { RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_y_rmsd1p5",       filename: s1p5.x_to_y]) }
+workflow X_TO_Y_5_POSIT_RMSD_1P5      { RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_y_5_rmsd1p5",     filename: s1p5.x_to_y_5]) }
+workflow X_TO_NOT_X_POSIT_RMSD_1P5    { RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_not_x_rmsd1p5",   filename: s1p5.x_to_not_x]) }
+workflow NOT_X_TO_X_POSIT_RMSD_1P5    { RUN_ANALYSIS(results.posit_single_pose, [label: "not_x_to_x_rmsd1p5",   filename: s1p5.not_x_to_x]) }
+workflow NOT_X_TO_X_5_POSIT_RMSD_1P5  { RUN_ANALYSIS(results.posit_single_pose, [label: "not_x_to_x_5_rmsd1p5", filename: s1p5.not_x_to_x_5]) }
+workflow ECFP4_POSIT_RMSD_1P5         { RUN_ANALYSIS(results.posit_single_pose, [label: "ecfp4_rmsd1p5",         filename: s1p5.ecfp4]) }
+workflow MCS_POSIT_RMSD_1P5           { RUN_ANALYSIS(results.posit_single_pose, [label: "mcs_rmsd1p5",           filename: s1p5.mcs]) }
+workflow TC_POSIT_RMSD_1P5            { RUN_ANALYSIS(results.posit_single_pose, [label: "tc_rmsd1p5",            filename: s1p5.tc]) }
+
 workflow analyze_posit_rmsd_1p5 {
-    def s = make_settings_map_for_cutoff("1.5")
-    RUN_ANALYSIS(results.posit_single_pose, [label: "datesplit_rmsd1p5",    filename: s.datesplit])
-    RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_x_rmsd1p5",       filename: s.x_to_x])
-    RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_x_5_rmsd1p5",     filename: s.x_to_x_5])
-    RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_y_rmsd1p5",       filename: s.x_to_y])
-    RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_y_5_rmsd1p5",     filename: s.x_to_y_5])
-    RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_not_x_rmsd1p5",   filename: s.x_to_not_x])
-    RUN_ANALYSIS(results.posit_single_pose, [label: "not_x_to_x_rmsd1p5",   filename: s.not_x_to_x])
-    RUN_ANALYSIS(results.posit_single_pose, [label: "not_x_to_x_5_rmsd1p5", filename: s.not_x_to_x_5])
-    RUN_ANALYSIS(results.posit_single_pose, [label: "ecfp4_rmsd1p5",         filename: s.ecfp4])
-    RUN_ANALYSIS(results.posit_single_pose, [label: "mcs_rmsd1p5",           filename: s.mcs])
-    RUN_ANALYSIS(results.posit_single_pose, [label: "tc_rmsd1p5",            filename: s.tc])
+    DATESPLIT_POSIT_RMSD_1P5()
+    X_TO_X_POSIT_RMSD_1P5()
+    X_TO_X_5_POSIT_RMSD_1P5()
+    X_TO_Y_POSIT_RMSD_1P5()
+    X_TO_Y_5_POSIT_RMSD_1P5()
+    X_TO_NOT_X_POSIT_RMSD_1P5()
+    NOT_X_TO_X_POSIT_RMSD_1P5()
+    NOT_X_TO_X_5_POSIT_RMSD_1P5()
+    ECFP4_POSIT_RMSD_1P5()
+    MCS_POSIT_RMSD_1P5()
+    TC_POSIT_RMSD_1P5()
 }
 
+// 2.5 Å — individual workflows
+def s2p5 = make_settings_map_for_cutoff("2.5")
+workflow DATESPLIT_POSIT_RMSD_2P5     { RUN_ANALYSIS(results.posit_single_pose, [label: "datesplit_rmsd2p5",    filename: s2p5.datesplit]) }
+workflow X_TO_X_POSIT_RMSD_2P5        { RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_x_rmsd2p5",       filename: s2p5.x_to_x]) }
+workflow X_TO_X_5_POSIT_RMSD_2P5      { RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_x_5_rmsd2p5",     filename: s2p5.x_to_x_5]) }
+workflow X_TO_Y_POSIT_RMSD_2P5        { RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_y_rmsd2p5",       filename: s2p5.x_to_y]) }
+workflow X_TO_Y_5_POSIT_RMSD_2P5      { RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_y_5_rmsd2p5",     filename: s2p5.x_to_y_5]) }
+workflow X_TO_NOT_X_POSIT_RMSD_2P5    { RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_not_x_rmsd2p5",   filename: s2p5.x_to_not_x]) }
+workflow NOT_X_TO_X_POSIT_RMSD_2P5    { RUN_ANALYSIS(results.posit_single_pose, [label: "not_x_to_x_rmsd2p5",   filename: s2p5.not_x_to_x]) }
+workflow NOT_X_TO_X_5_POSIT_RMSD_2P5  { RUN_ANALYSIS(results.posit_single_pose, [label: "not_x_to_x_5_rmsd2p5", filename: s2p5.not_x_to_x_5]) }
+workflow ECFP4_POSIT_RMSD_2P5         { RUN_ANALYSIS(results.posit_single_pose, [label: "ecfp4_rmsd2p5",         filename: s2p5.ecfp4]) }
+workflow MCS_POSIT_RMSD_2P5           { RUN_ANALYSIS(results.posit_single_pose, [label: "mcs_rmsd2p5",           filename: s2p5.mcs]) }
+workflow TC_POSIT_RMSD_2P5            { RUN_ANALYSIS(results.posit_single_pose, [label: "tc_rmsd2p5",            filename: s2p5.tc]) }
+
 workflow analyze_posit_rmsd_2p5 {
-    def s = make_settings_map_for_cutoff("2.5")
-    RUN_ANALYSIS(results.posit_single_pose, [label: "datesplit_rmsd2p5",    filename: s.datesplit])
-    RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_x_rmsd2p5",       filename: s.x_to_x])
-    RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_x_5_rmsd2p5",     filename: s.x_to_x_5])
-    RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_y_rmsd2p5",       filename: s.x_to_y])
-    RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_y_5_rmsd2p5",     filename: s.x_to_y_5])
-    RUN_ANALYSIS(results.posit_single_pose, [label: "x_to_not_x_rmsd2p5",   filename: s.x_to_not_x])
-    RUN_ANALYSIS(results.posit_single_pose, [label: "not_x_to_x_rmsd2p5",   filename: s.not_x_to_x])
-    RUN_ANALYSIS(results.posit_single_pose, [label: "not_x_to_x_5_rmsd2p5", filename: s.not_x_to_x_5])
-    RUN_ANALYSIS(results.posit_single_pose, [label: "ecfp4_rmsd2p5",         filename: s.ecfp4])
-    RUN_ANALYSIS(results.posit_single_pose, [label: "mcs_rmsd2p5",           filename: s.mcs])
-    RUN_ANALYSIS(results.posit_single_pose, [label: "tc_rmsd2p5",            filename: s.tc])
+    DATESPLIT_POSIT_RMSD_2P5()
+    X_TO_X_POSIT_RMSD_2P5()
+    X_TO_X_5_POSIT_RMSD_2P5()
+    X_TO_Y_POSIT_RMSD_2P5()
+    X_TO_Y_5_POSIT_RMSD_2P5()
+    X_TO_NOT_X_POSIT_RMSD_2P5()
+    NOT_X_TO_X_POSIT_RMSD_2P5()
+    NOT_X_TO_X_5_POSIT_RMSD_2P5()
+    ECFP4_POSIT_RMSD_2P5()
+    MCS_POSIT_RMSD_2P5()
+    TC_POSIT_RMSD_2P5()
 }
 // ── end RMSD cutoff sensitivity ──────────────────────────────────────────────
 
