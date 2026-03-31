@@ -407,6 +407,15 @@ def _(ref_counts_df):
 
 @app.cell
 def _():
+    #
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Next do a random experiment where you match the total number of available Query-Reference pairs but you pick them randomly instead of picking them based on the TC cutoff.
+    """)
     return
 
 
