@@ -291,7 +291,7 @@ def _(df, np):
         for tc in tc_thresholds
         for _ in range(_n_bootstraps)
     )
-    return (manual_results_v2,)
+    return Parallel, manual_results_v2
 
 
 @app.cell
@@ -330,6 +330,7 @@ def _(df, np, pd):
     _tc_thresholds = np.linspace(0, 1, 50)
 
     _rows = []
+    tc_query_counts = {}  # tc (raw 0-1) -> Series(Query_Ligand -> n_refs available)
     for _tc in _tc_thresholds:
         _sub = df[df["TanimotoComboData_Tanimoto"] <= _tc]
         _sub = _sub.groupby(["Query_Ligand", "Reference_Ligand"]).head(1)
@@ -350,10 +351,95 @@ def _(df, np, pd):
                 "Std_Good_Refs": _good.std(),
             }
         )
+        tc_query_counts[_tc] = _total  # per-query counts at this threshold
 
     ref_counts_df = pd.DataFrame(_rows)
     ref_counts_df
-    return (ref_counts_df,)
+    return ref_counts_df, tc_query_counts
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    # Random reference selection baseline
+
+    For each TC threshold, sample the same number of references per query as
+    the TC filter would allow — but pick them uniformly at random from *all*
+    references (ignoring TC similarity). This gives a null baseline: does the
+    TC-based filtering actually help over random selection of the same size?
+    """)
+    return
+
+
+@app.cell
+def _(Parallel, df, np, pd, tc_query_counts):
+    _n_bootstraps = 50
+    _tc_list = sorted(tc_query_counts.keys())
+
+    def _run_random_bootstrap(_query_counts, _df_full):
+        # Sample the same n_refs per query as the TC filter provides, but randomly
+        _shuffled = _df_full.sample(frac=1).copy()
+        _shuffled["_rank"] = _shuffled.groupby("Query_Ligand").cumcount()
+        _rank_limit = _shuffled["Query_Ligand"].map(_query_counts).fillna(0)
+        _sampled = _shuffled[_shuffled["_rank"] < _rank_limit].drop(columns="_rank")
+        if _sampled.empty:
+            return 0.0
+        _idx = _sampled.groupby("Query_Ligand")["PoseData_docking-confidence-POSIT"].idxmax()
+        _top1 = _sampled.loc[_idx]
+        return (_top1["PoseData_RMSD"] <= 2).sum() / 403
+
+    _raw = Parallel(n_jobs=-1)(
+        _delayed(_run_random_bootstrap)(tc_query_counts[_tc], df)
+        for _tc in _tc_list
+        for _ in range(_n_bootstraps)
+    )
+
+    _results = np.array(_raw).reshape(len(_tc_list), _n_bootstraps)
+    random_results_df = pd.DataFrame({
+        "TC_Threshold": [_tc * 2 for _tc in _tc_list],
+        "Avg_Success_Rate": _results.mean(axis=1),
+        "Std_Success_Rate": _results.std(axis=1),
+    })
+    random_results_df
+    return (random_results_df,)
+
+
+@app.cell
+def _(manual_results_v2, pd, plt, random_results_df, sns):
+    # TC-filtered results: use N_Ref=403 (all available refs at each threshold)
+    _tc_df = pd.DataFrame(manual_results_v2)
+    _tc_agg = (
+        _tc_df[_tc_df["N_Ref"] == 403]
+        .groupby("TC_Threshold")["Success_Rate"]
+        .agg(Avg_Success_Rate="mean", Std_Success_Rate="std")
+        .reset_index()
+    )
+    # Scale TC_Threshold to TanimotoCombo [0,2]
+    _tc_agg["TC_Threshold"] = _tc_agg["TC_Threshold"] * 2
+
+    _fig, _ax = plt.subplots(figsize=(7, 4))
+
+    for _label, _data, _color in [
+        ("TC-filtered (all available refs)", _tc_agg, "steelblue"),
+        ("Random (matched pair count)", random_results_df, "coral"),
+    ]:
+        _ax.plot(_data["TC_Threshold"], _data["Avg_Success_Rate"], label=_label, color=_color)
+        _ax.fill_between(
+            _data["TC_Threshold"],
+            _data["Avg_Success_Rate"] - _data["Std_Success_Rate"],
+            _data["Avg_Success_Rate"] + _data["Std_Success_Rate"],
+            color=_color,
+            alpha=0.2,
+        )
+
+    _ax.set_xlabel("TanimotoCombo Threshold (Aligned)")
+    _ax.set_ylabel("Success rate (fraction posed <2 Å RMSD)")
+    _ax.set_title("TC-filtered vs random reference selection\n(matched number of pairs per query)")
+    _ax.legend()
+    sns.despine(ax=_ax)
+    plt.tight_layout()
+    plt.show()
+    return
 
 
 @app.cell
@@ -402,7 +488,7 @@ def _(ref_counts_df):
 
     plt.tight_layout()
     plt.show()
-    return
+    return plt, sns
 
 
 @app.cell
