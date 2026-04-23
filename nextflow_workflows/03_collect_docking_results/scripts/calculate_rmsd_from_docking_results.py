@@ -2,10 +2,9 @@
 
 from pathlib import Path
 from tqdm import tqdm
-from asapdiscovery.docking.openeye import POSITDockingResults
-from asapdiscovery.data.schema.ligand import Ligand
-from asapdiscovery.data.readers.molfile import MolFileFactory
-from asapdiscovery.data.backend.openeye import oechem
+from drugforge.data.schema.ligand import Ligand
+from drugforge.data.readers.molfile import MolFileFactory
+from drugforge.data.backend.openeye import oechem
 import argparse
 import pandas as pd
 
@@ -104,8 +103,12 @@ def main():
 
     # We don't want to filter across targets (at least at first)
     from collections import defaultdict
+
     pose_dict = defaultdict(list)
-    _ = [pose_dict[lig.tags["ReferenceStructureName"]].append(lig) for lig in docked_poses]
+    _ = [
+        pose_dict[lig.tags["ReferenceStructureName"]].append(lig)
+        for lig in docked_poses
+    ]
     filtered_results = []
     for target_name, posed_mols in pose_dict.items():
         filtered_results.extend(get_filtered_poses(posed_mols, cutoff=args.cutoff))
@@ -117,15 +120,18 @@ def main():
 
         # no need to return anything because the posed_lig is modified directly
         calculate_ligand_rmsd(ref, posed_lig)
-        records.append({"Query_Ligand": posed_lig.compound_name,
-                        "Pose_ID": int(posed_lig.tags["Pose_ID"]),
-                        "RMSD": posed_lig.tags["RMSD"],
-                        "Reference_Structure": posed_lig.tags["ReferenceStructureName"],
-                        "Reference_Ligand": posed_lig.tags["ReferenceLigandName"],
-                        "docking-confidence-POSIT": posed_lig.tags["docking-confidence-POSIT"],
-                        "POSIT_Method": posed_lig.tags["_POSIT_method"],
-                        "SMILES": posed_lig.smiles
-                        })
+        records.append(
+            {
+                "Query_Ligand": posed_lig.compound_name,
+                "Pose_ID": int(posed_lig.tags["Pose_ID"]),
+                "RMSD": posed_lig.tags["RMSD"],
+                "Reference_Structure": posed_lig.tags["ReferenceStructureName"],
+                "Reference_Ligand": posed_lig.tags["ReferenceLigandName"],
+                "docking-confidence-POSIT": posed_lig.tags["docking-confidence-POSIT"],
+                "POSIT_Method": posed_lig.tags["_POSIT_method"],
+                "SMILES": posed_lig.smiles,
+            }
+        )
 
     print("Writing output")
     df = pd.DataFrame.from_records(records)

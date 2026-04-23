@@ -169,6 +169,50 @@ process RUN_EVALUATORS_LIGHTWEIGHT {
     --n-cpus 8
     """
 }
+process CALCULATE_PLIF_RECALL {
+    publishDir "${params.evaluationResults}/plif_recall", mode: 'copy', overwrite: true
+    conda "${params.drugforge}"
+    tag "plif-recall ${docked_sdf}"
+    errorStrategy = { task.exitStatus in [137,140,143,247] ? 'retry' : 'terminate' }
+    maxRetries 3
+    memory { task.attempt > 1 ? (2 ** (task.attempt - 1)) * 8.GB : 8.GB }
+    time { task.attempt > 1 ? (2 ** (task.attempt - 1)) * 10.m : 10.m }
+    label 'cpushort'
+
+    input:
+    path(docked_sdf)
+
+    output:
+    path("*.csv"), emit: plif_recall_csv
+
+    script:
+    """
+    python3 "${projectDir}/scripts"/calculate_plif_recall.py \
+        --docked-sdf "${docked_sdf}" \
+        --cache-dir "${params.fixedFragalysisCachePath}" \
+        --output-csv "${docked_sdf.parent.name}_plif_recall.csv"
+    """
+}
+
+process COMBINE_PLIF_RECALL {
+    publishDir "${params.evaluationResults}", mode: 'copy', overwrite: true
+    conda "${params.drugforge}"
+    tag "combine-plif-recall"
+
+    input:
+    path("plif_recall_*.csv")
+
+    output:
+    path("plif_recall_combined.csv"), emit: combined_csv
+
+    script:
+    """
+    python3 "${params.scripts}/combine_evaluation_results.py" \
+        plif_recall_*.csv \
+        plif_recall_combined.csv
+    """
+}
+
 process COMBINE_EVALUATIONS {
     publishDir "${params.evaluationResults}", mode: 'copy', overwrite: true
     conda "${params.harbor}"

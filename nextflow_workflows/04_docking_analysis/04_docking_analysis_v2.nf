@@ -8,6 +8,8 @@ include {
     COMBINE_EVALUATIONS
     CREATE_MULTIPOSE_EVALUATORS
     CREATE_EVALUATORS_MODULAR
+    CALCULATE_PLIF_RECALL
+    COMBINE_PLIF_RECALL
 } from "./modules.nf"
 params.K = 10
 
@@ -382,3 +384,17 @@ workflow POSIT_REVERSE_SIMILARITY_SPLIT {
         all_results
     )
 }
+// ── PLIF Recall analysis (R1.2, R2.2) ───────────────────────────────────────
+workflow PLIF_RECALL_POSIT {
+    sdfs_ch = Channel.fromPath(
+        "${params.dockedFiles}/ALL_1_poses/*/docking_results.sdf"
+    )
+
+    CALCULATE_PLIF_RECALL(sdfs_ch)
+
+    COMBINE_PLIF_RECALL(
+        CALCULATE_PLIF_RECALL.output.plif_recall_csv
+            .collect()
+    )
+}
+// ── end PLIF Recall ──────────────────────────────────────────────────────────
