@@ -388,7 +388,7 @@ workflow POSIT_REVERSE_SIMILARITY_SPLIT {
 workflow PLIF_RECALL_POSIT {
     sdfs_ch = Channel.fromPath(
         "${params.dockedFiles}/ALL_1_poses/*/docking_results.sdf"
-    )
+    ).map { sdf -> tuple(sdf.parent.name, sdf) }
 
     CALCULATE_PLIF_RECALL(sdfs_ch)
 
