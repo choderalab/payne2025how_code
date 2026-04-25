@@ -205,7 +205,7 @@ process COMBINE_PLIF_RECALL {
 
     script:
     """
-    python3 "${projectDir}/scripts"/combine_evaluation_results.py" \
+    python3 "${projectDir}/scripts"/combine_evaluation_results.py \
         plif_recall_*.csv \
         plif_recall_combined.csv
     """
