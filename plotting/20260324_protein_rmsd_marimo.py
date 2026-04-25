@@ -296,8 +296,129 @@ def _(earliest_refs, max_rmsd_val, palette, plt, rmsd_df_dated, save_fig, sns):
 
 
 @app.cell
+def _(earliest_refs, max_rmsd_val, palette, plt, rmsd_df_dated, save_fig, sns):
+    from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
+
+    fig3 = plt.figure(figsize=(14, 8))
+    fig3.suptitle(
+        "Protein RMSD vs query structure date with RMSD marginal distributions (heavy atom)",
+        fontsize=13,
+    )
+
+    _outer = GridSpec(2, 2, figure=fig3, hspace=0.45, wspace=0.4)
+    _marker_map = {"x": "o", "P": "^"}
+    _hist_axes = []
+
+    _all_dates = rmsd_df_dated["Query_Date"].dropna()
+    _date_pad = (_all_dates.max() - _all_dates.min()) * 0.02
+    _date_min = _all_dates.min() - _date_pad
+    _date_max = _all_dates.max() + _date_pad
+
+    for _i, _scaffold_id in enumerate([1, 2, 3, 4]):
+        _row, _col = divmod(_i, 2)
+        _inner = GridSpecFromSubplotSpec(
+            1, 2, subplot_spec=_outer[_row, _col], width_ratios=[4, 1], wspace=0.05
+        )
+        _ax_main = fig3.add_subplot(_inner[0, 0])
+        _ax_hist = fig3.add_subplot(_inner[0, 1], sharey=_ax_main)
+
+        _ref = earliest_refs[_scaffold_id]
+        _subset = rmsd_df_dated[
+            (rmsd_df_dated["QueryData_Scaffold_ID"] == _scaffold_id)
+            & (rmsd_df_dated["RefData_Scaffold_ID"] == _scaffold_id)
+            & (rmsd_df_dated["Reference_Structure"] == _ref)
+        ].dropna(subset=["Query_Date"])
+
+        sns.scatterplot(
+            data=_subset,
+            x="Query_Date",
+            y="ProteinRMSDData_RMSD",
+            hue="Scope",
+            style="Query_Structure_Series",
+            palette=palette,
+            markers=_marker_map,
+            alpha=0.6,
+            s=20,
+            ax=_ax_main,
+            legend=False,
+        )
+        _ax_main.set_title(f"Scaffold {_scaffold_id}\n(ref: {_ref})", fontsize=10)
+        _ax_main.set_xlabel("Query structure date")
+        _ax_main.set_ylabel("Protein RMSD (Å)")
+        _ax_main.set_ylim(0, max_rmsd_val)
+        _ax_main.set_xlim(_date_min, _date_max)
+        _ax_main.tick_params(axis="x", rotation=30)
+
+        _bins = [max_rmsd_val * i / 20 for i in range(21)]
+        for _scope, _color in palette.items():
+            _vals = _subset.loc[
+                _subset["Scope"] == _scope, "ProteinRMSDData_RMSD"
+            ].dropna()
+            _ax_hist.hist(
+                _vals,
+                bins=_bins,
+                orientation="horizontal",
+                color=_color,
+                alpha=0.7,
+                density=False,
+                histtype="stepfilled",
+            )
+
+        _ax_hist.set_xlabel("Count", fontsize=8)
+        plt.setp(_ax_hist.get_yticklabels(), visible=False)
+        _ax_hist.tick_params(axis="y", length=0)
+        sns.despine(ax=_ax_hist, left=True)
+        _hist_axes.append(_ax_hist)
+
+    _max_hist_x = max(ax.get_xlim()[1] for ax in _hist_axes)
+    for _ax_h in _hist_axes:
+        _ax_h.set_xlim(0, _max_hist_x)
+
+    handles3 = [
+        plt.Line2D(
+            [0], [0], marker="o", color="w",
+            markerfacecolor=palette["Full chain"], markersize=8, alpha=0.7,
+            label="Full chain",
+        ),
+        plt.Line2D(
+            [0], [0], marker="o", color="w",
+            markerfacecolor=palette["Binding site only"], markersize=8, alpha=0.7,
+            label="Binding site only",
+        ),
+        plt.Line2D(
+            [0], [0], marker="o", color="grey", markersize=8, alpha=0.7,
+            linestyle="None", label="Monoclinic (x-series)",
+        ),
+        plt.Line2D(
+            [0], [0], marker="^", color="grey", markersize=8, alpha=0.7,
+            linestyle="None", label="Orthorhombic (p-series)",
+        ),
+    ]
+    fig3.legend(
+        handles=handles3, loc="lower center", ncol=4,
+        bbox_to_anchor=(0.5, -0.04), fontsize=9,
+    )
+
+    save_fig(fig3, "protein_rmsd_vs_date_marginal")
+    save_fig(fig3, "protein_rmsd_vs_date_marginal", suffix=".png")
+    plt.show()
+    return
+
+
+@app.cell
 def _(rmsd_df):
     rmsd_df
+    return
+
+
+@app.cell
+def _():
+    # Combine both plots
+    return
+
+
+@app.cell
+def _():
     return
 
 
