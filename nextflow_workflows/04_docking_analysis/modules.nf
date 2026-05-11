@@ -235,6 +235,31 @@ process MERGE_PLIF_RECALL {
     """
 }
 
+process FILTER_PLIF_PARQUET {
+    conda "${params.harbor}"
+    tag "filter-plif-${filter_type}"
+    memory { 8.GB }
+    time { 10.m }
+    label 'cpushort'
+
+    input:
+    val(filter_type)
+    path(input_parquet)
+    path(input_json)
+
+    output:
+    path("${filter_type}.parquet"), emit: filtered_parquet
+    path("${filter_type}.json"),   emit: filtered_json
+
+    script:
+    """
+    python3 "${projectDir}/scripts"/filter_plif_parquet.py \
+        --input-parquet "${input_parquet}" \
+        --filter-type "${filter_type}" \
+        --output-stem "${filter_type}"
+    """
+}
+
 process CREATE_EVALUATOR_FACTORY_SETTINGS_PLIF_SCORER {
     publishDir "${params.evaluator_configs}"
     conda "${params.harbor}"
