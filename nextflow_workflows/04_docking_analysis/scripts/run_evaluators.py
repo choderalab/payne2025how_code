@@ -28,7 +28,14 @@ from harbor.analysis.utils import FileLogger
     default=1,
     help="Number of CPUs to use for parallel processing.",
 )
-def run_evaluators(evaluator_jsons, input_parquet, output, n_cpus):
+@click.option(
+    "--n-bootstraps",
+    type=int,
+    default=None,
+    help="Number of bootstraps to use instead of the number "
+    "specified in the evaluator. Defaults to None, useful for testing",
+)
+def run_evaluators(evaluator_jsons, input_parquet, output, n_cpus, n_bootstraps):
     output.mkdir(exist_ok=True, parents=True)
 
     logger = FileLogger(
@@ -43,12 +50,14 @@ def run_evaluators(evaluator_jsons, input_parquet, output, n_cpus):
     logger.info(f"Reading in {len(evaluator_jsons)} evaluators")
     evaluators = [Evaluator.from_json_file(evaluator) for evaluator in evaluator_jsons]
 
+    # Enable command-line override of n_bootstraps for all evaluators (if specified)
+    if n_bootstraps is not None:
+        for evaluator in evaluators:
+            evaluator.n_bootstraps = n_bootstraps
+
     logger.info(f"Number of evaluators: {len(evaluators)}")
 
-    results = [
-        results
-        for results in Results.calculate_results(data, evaluators, n_cpus=n_cpus)
-    ]
+    results = Results.calculate_results(data, evaluators, n_cpus=n_cpus)
 
     logger.info(f"Writing results to disk at {output}")
     results_df = Results.df_from_results(results)

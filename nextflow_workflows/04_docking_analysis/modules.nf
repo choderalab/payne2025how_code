@@ -110,14 +110,11 @@ process CREATE_EVALUATORS_MODULAR {
 process RUN_EVALUATORS {
     conda "${params.harbor}"
     tag "run-evaluators ${name}"
-    errorStrategy = { task.exitStatus in [137,140,143,247] ? 'retry' : 'terminate' }
-    maxRetries 3
-    // Dynamic memory allocation
-    memory { task.attempt > 1 ? (2 ** (task.attempt - 1)) * 256.GB : 256.GB }
-    // Dynamic time allocation
-    time { task.attempt > 1 ? (2 ** (task.attempt - 1)) * 1.h : 1.h }
+    errorStrategy 'terminate'
+    memory 16.GB
+    time 1.h
     // set n cpus to request
-    cpus 32
+    cpus 8
     'lenient'
 
     input:
@@ -135,7 +132,7 @@ process RUN_EVALUATORS {
     python3 "${projectDir}/scripts"/run_evaluators.py \
     evaluator_jsons_* \
     --input-parquet "${docking_results_parquet}" \
-    --n-cpus 32
+    --n-cpus 8
     """
 }
 process RUN_EVALUATORS_LIGHTWEIGHT {

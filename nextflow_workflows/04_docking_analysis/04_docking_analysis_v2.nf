@@ -13,7 +13,7 @@ include {
     COMBINE_PLIF_RECALL
     MERGE_PLIF_RECALL
 } from "./modules.nf"
-params.K = 10
+params.K = 4
 
 workflow RUN_DOCKING_ANALYSIS {
     take:
