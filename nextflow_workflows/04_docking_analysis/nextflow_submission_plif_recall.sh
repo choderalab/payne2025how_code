@@ -15,4 +15,4 @@ source ~/.nextflowrc
 #nextflow 04_docking_analysis_v2.nf -entry PLIF_RECALL_POSIT -c ../nextflow.config -c nextflow.config -resume
 #nextflow 04_docking_analysis_v2.nf -entry PLIF_MERGE_POSIT -c ../nextflow.config -c nextflow.config
 #nextflow 04_docking_analysis_v2.nf -entry GENERATE_SETTINGS_PLIF -c ../nextflow.config -c nextflow.config
-nextflow 04_docking_analysis_v2.nf -entry PLIF_DATESPLIT_POSIT -c ../nextflow.config -c nextflow.config
+nextflow 04_docking_analysis_v2.nf -entry PLIF_DATESPLIT_POSIT -c ../nextflow.config -c nextflow.config -resume
