@@ -2,6 +2,7 @@
 include {
     CREATE_EVALUATOR_FACTORY_SETTINGS
     CREATE_EVALUATOR_FACTORY_SETTINGS_CUTOFF
+    CREATE_EVALUATOR_FACTORY_SETTINGS_PLIF
     CREATE_EVALUATORS
     RUN_EVALUATORS
     RUN_EVALUATORS_LIGHTWEIGHT
@@ -10,6 +11,7 @@ include {
     CREATE_EVALUATORS_MODULAR
     CALCULATE_PLIF_RECALL
     COMBINE_PLIF_RECALL
+    MERGE_PLIF_RECALL
 } from "./modules.nf"
 params.K = 10
 
@@ -398,3 +400,74 @@ workflow PLIF_RECALL_POSIT {
     )
 }
 // ── end PLIF Recall ──────────────────────────────────────────────────────────
+
+// ── PLIF Recall analysis — evaluator pipeline (runs after PLIF_RECALL_POSIT) ─
+// Merges plif_recall_combined.csv into the POSIT single-pose parquet, generates
+// evaluator configs, and runs the full analysis with PLIF recall as the success
+// metric.  Run -entry GENERATE_SETTINGS_PLIF first, then PLIF_RECALL_ANALYSIS.
+
+def make_plif_settings_map(String cutoff_label) {
+    def suffix = "_plif${cutoff_label}"
+    return [
+        "datesplit"   : "${params.evaluator_configs}/reference_split_comparison${suffix}.yaml",
+        "x_to_x"      : "${params.evaluator_configs}/x_to_x_scaffold_split${suffix}.yaml",
+        "x_to_x_5"    : "${params.evaluator_configs}/x_to_x_scaffold_split_5_refs${suffix}.yaml",
+        "x_to_y"      : "${params.evaluator_configs}/x_to_y_scaffold_split${suffix}.yaml",
+        "x_to_y_5"    : "${params.evaluator_configs}/x_to_y_scaffold_split_5_refs${suffix}.yaml",
+        "x_to_not_x"  : "${params.evaluator_configs}/x_to_not_x_scaffold_split${suffix}.yaml",
+        "not_x_to_x"  : "${params.evaluator_configs}/not_x_to_x_scaffold_split${suffix}.yaml",
+        "not_x_to_x_5": "${params.evaluator_configs}/not_x_to_x_scaffold_split_5_refs${suffix}.yaml",
+        "ecfp4"        : "${params.evaluator_configs}/increasing_similarity_ecfp4${suffix}.yaml",
+        "mcs"          : "${params.evaluator_configs}/increasing_similarity_mcs${suffix}.yaml",
+        "tc"           : "${params.evaluator_configs}/increasing_similarity_tanimoto_combo_aligned${suffix}.yaml",
+    ]
+}
+
+workflow GENERATE_SETTINGS_PLIF {
+    CREATE_EVALUATOR_FACTORY_SETTINGS_PLIF(Channel.value(0.5))
+}
+
+def sp5 = make_plif_settings_map("0.5")
+
+workflow PLIF_MERGE_POSIT {
+    plif_csv = Channel.fromPath("${params.evaluationResults}/plif_recall_combined.csv")
+    MERGE_PLIF_RECALL(
+        "ALL_1_poses",
+        results.posit_single_pose.docking_results_parquet,
+        plif_csv,
+    )
+}
+
+workflow PLIF_DATESPLIT_POSIT {
+    plif_parquet = "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet"
+    RUN_ANALYSIS(
+        [name: "ALL_1_poses_plif", docking_results_parquet: plif_parquet,
+         docking_results_json: results.posit_single_pose.docking_results_json],
+        [label: "datesplit_plif0.5", filename: sp5.datesplit]
+    )
+}
+workflow PLIF_X_TO_X_POSIT        { RUN_ANALYSIS([name: "ALL_1_poses_plif", docking_results_parquet: "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet", docking_results_json: results.posit_single_pose.docking_results_json], [label: "x_to_x_plif0.5",        filename: sp5.x_to_x]) }
+workflow PLIF_X_TO_X_5_POSIT      { RUN_ANALYSIS([name: "ALL_1_poses_plif", docking_results_parquet: "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet", docking_results_json: results.posit_single_pose.docking_results_json], [label: "x_to_x_5_plif0.5",      filename: sp5.x_to_x_5]) }
+workflow PLIF_X_TO_Y_POSIT        { RUN_ANALYSIS([name: "ALL_1_poses_plif", docking_results_parquet: "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet", docking_results_json: results.posit_single_pose.docking_results_json], [label: "x_to_y_plif0.5",        filename: sp5.x_to_y]) }
+workflow PLIF_X_TO_Y_5_POSIT      { RUN_ANALYSIS([name: "ALL_1_poses_plif", docking_results_parquet: "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet", docking_results_json: results.posit_single_pose.docking_results_json], [label: "x_to_y_5_plif0.5",      filename: sp5.x_to_y_5]) }
+workflow PLIF_NOT_X_TO_X_POSIT    { RUN_ANALYSIS([name: "ALL_1_poses_plif", docking_results_parquet: "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet", docking_results_json: results.posit_single_pose.docking_results_json], [label: "not_x_to_x_plif0.5",    filename: sp5.not_x_to_x]) }
+workflow PLIF_NOT_X_TO_X_5_POSIT  { RUN_ANALYSIS([name: "ALL_1_poses_plif", docking_results_parquet: "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet", docking_results_json: results.posit_single_pose.docking_results_json], [label: "not_x_to_x_5_plif0.5",  filename: sp5.not_x_to_x_5]) }
+workflow PLIF_X_TO_NOT_X_POSIT    { RUN_ANALYSIS([name: "ALL_1_poses_plif", docking_results_parquet: "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet", docking_results_json: results.posit_single_pose.docking_results_json], [label: "x_to_not_x_plif0.5",    filename: sp5.x_to_not_x]) }
+workflow PLIF_TC_POSIT            { RUN_ANALYSIS([name: "ALL_1_poses_plif", docking_results_parquet: "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet", docking_results_json: results.posit_single_pose.docking_results_json], [label: "tc_plif0.5",            filename: sp5.tc]) }
+workflow PLIF_MCS_POSIT           { RUN_ANALYSIS([name: "ALL_1_poses_plif", docking_results_parquet: "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet", docking_results_json: results.posit_single_pose.docking_results_json], [label: "mcs_plif0.5",           filename: sp5.mcs]) }
+workflow PLIF_ECFP4_POSIT         { RUN_ANALYSIS([name: "ALL_1_poses_plif", docking_results_parquet: "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet", docking_results_json: results.posit_single_pose.docking_results_json], [label: "ecfp4_plif0.5",         filename: sp5.ecfp4]) }
+
+workflow analyze_posit_plif {
+    PLIF_DATESPLIT_POSIT()
+    PLIF_X_TO_X_POSIT()
+    PLIF_X_TO_X_5_POSIT()
+    PLIF_X_TO_Y_POSIT()
+    PLIF_X_TO_Y_5_POSIT()
+    PLIF_NOT_X_TO_X_POSIT()
+    PLIF_NOT_X_TO_X_5_POSIT()
+    PLIF_X_TO_NOT_X_POSIT()
+    PLIF_TC_POSIT()
+    PLIF_MCS_POSIT()
+    PLIF_ECFP4_POSIT()
+}
+// ── end PLIF Recall analysis ─────────────────────────────────────────────────

@@ -188,7 +188,8 @@ process CALCULATE_PLIF_RECALL {
     python3 "${projectDir}/scripts"/calculate_plif_recall.py \
         --docked-sdf "${docked_sdf}" \
         --cache-dir "${params.fixedFragalysisCachePath}" \
-        --output-csv "${job_name}_plif_recall.csv"
+        --cmpd-dict "${params.cmpdDateDictPath}" \
+        --output-csv "plif_recall_${job_name}.csv"
     """
 }
 
@@ -208,6 +209,53 @@ process COMBINE_PLIF_RECALL {
     python3 "${projectDir}/scripts"/combine_evaluation_results.py \
         plif_recall_*.csv \
         plif_recall_combined.csv
+    """
+}
+
+process MERGE_PLIF_RECALL {
+    publishDir "${params.combinedDockingResultsPath}", mode: 'copy', overwrite: false
+    conda "${params.harbor}"
+    tag "merge-plif-recall ${name}"
+    memory { 8.GB }
+    time { 10.m }
+    label 'cpushort'
+
+    input:
+    val(name)
+    path(input_parquet)
+    path(plif_recall_csv)
+
+    output:
+    path("${name}_plif.parquet"), emit: merged_parquet
+
+    script:
+    """
+    python3 "${projectDir}/scripts"/merge_plif_recall.py \
+        --input-parquet "${input_parquet}" \
+        --plif-recall-csv "${plif_recall_csv}" \
+        --output-parquet "${name}_plif.parquet"
+    """
+}
+
+process CREATE_EVALUATOR_FACTORY_SETTINGS_PLIF {
+    publishDir "${params.evaluator_configs}"
+    conda "${params.harbor}"
+    tag "create-evaluator-factory-settings-plif${plif_cutoff}"
+    cache false
+    memory { 4.GB }
+    time { 10.m }
+    label 'cpushort'
+
+    input:
+    val(plif_cutoff)
+
+    output:
+    path("*.yaml"), emit: evaluator_configs
+
+    script:
+    """
+    python3 "${projectDir}/scripts"/create_evaluator_factory_settings_plif_recall.py \
+        --plif-cutoff "${plif_cutoff}"
     """
 }
 

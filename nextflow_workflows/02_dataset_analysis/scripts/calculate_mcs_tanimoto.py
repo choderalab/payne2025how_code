@@ -69,6 +69,11 @@ def one_to_many_mcs(refmol: oechem.OEMol, querymols: list[oechem.OEMol]):
             mcs_num_atoms[j] = mcs.NumAtoms()
         except StopIteration:
             mcs_num_atoms[j] = 0
+        # TODO: asapdiscovery Ligand.from_oemol calls OEAddExplicitHydrogens before storing
+        # the SDF string, so to_oemol() returns a mol with explicit H. NumAtoms() with no
+        # predicate counts all atoms including H. Fix by calling
+        # oechem.OESuppressHydrogens(mol) on refmol/querymol before this loop, or use
+        # mol.NumAtoms(oechem.OEIsHeavy()) here and in the union calculation below.
         # Union = Total atoms - Overlap
         union_num_atoms[j] = refmol.NumAtoms() + querymol.NumAtoms() - mcs_num_atoms[j]
 
