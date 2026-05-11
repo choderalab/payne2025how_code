@@ -235,6 +235,24 @@ process MERGE_PLIF_RECALL {
     """
 }
 
+process CREATE_EVALUATOR_FACTORY_SETTINGS_PLIF_SCORER {
+    publishDir "${params.evaluator_configs}"
+    conda "${params.harbor}"
+    tag "create-evaluator-factory-settings-plif-scorer"
+    cache false
+    memory { 4.GB }
+    time { 10.m }
+    label 'cpushort'
+
+    output:
+    path("*.yaml"), emit: evaluator_configs
+
+    script:
+    """
+    python3 "${projectDir}/scripts"/create_evaluator_factory_settings_plif_scorer.py
+    """
+}
+
 process CREATE_EVALUATOR_FACTORY_SETTINGS_PLIF {
     publishDir "${params.evaluator_configs}"
     conda "${params.harbor}"

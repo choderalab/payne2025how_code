@@ -3,6 +3,7 @@ include {
     CREATE_EVALUATOR_FACTORY_SETTINGS
     CREATE_EVALUATOR_FACTORY_SETTINGS_CUTOFF
     CREATE_EVALUATOR_FACTORY_SETTINGS_PLIF
+    CREATE_EVALUATOR_FACTORY_SETTINGS_PLIF_SCORER
     CREATE_EVALUATORS
     RUN_EVALUATORS
     RUN_EVALUATORS_LIGHTWEIGHT
@@ -470,4 +471,50 @@ workflow analyze_posit_plif {
     PLIF_MCS_POSIT()
     PLIF_ECFP4_POSIT()
 }
+
+// ── PLIF cutoff sensitivity (0.75, 1.0) ──────────────────────────────────────
+// Reuses ALL_1_poses_plif.parquet — no CALCULATE/MERGE steps needed.
+// Run -entry GENERATE_SETTINGS_PLIF_0_75 or GENERATE_SETTINGS_PLIF_1_0 first.
+
+workflow GENERATE_SETTINGS_PLIF_0_75 {
+    CREATE_EVALUATOR_FACTORY_SETTINGS_PLIF(Channel.value(0.75))
+}
+
+workflow GENERATE_SETTINGS_PLIF_1_0 {
+    CREATE_EVALUATOR_FACTORY_SETTINGS_PLIF(Channel.value(1.0))
+}
+
+def sp75 = make_plif_settings_map("0.75")
+def sp10 = make_plif_settings_map("1.0")
+
+workflow PLIF_DATESPLIT_POSIT_0_75 { RUN_ANALYSIS(plif_result, [label: "datesplit_plif0.75", filename: sp75.datesplit]) }
+workflow PLIF_DATESPLIT_POSIT_1_0  { RUN_ANALYSIS(plif_result, [label: "datesplit_plif1.0",  filename: sp10.datesplit]) }
+
+workflow analyze_posit_plif_cutoffs {
+    PLIF_DATESPLIT_POSIT()
+    PLIF_DATESPLIT_POSIT_0_75()
+    PLIF_DATESPLIT_POSIT_1_0()
+}
+
+// ── PLIF Recall as scoring method ────────────────────────────────────────────
+// Selects poses by highest PLIF recall. Evaluated against four success metrics:
+// RMSD < 2 Å, PLIF >= 0.5, PLIF >= 0.75, PLIF >= 1.0.
+// Run -entry GENERATE_SETTINGS_PLIF_SCORER first, then analyze_posit_plif_scorer.
+
+workflow GENERATE_SETTINGS_PLIF_SCORER {
+    CREATE_EVALUATOR_FACTORY_SETTINGS_PLIF_SCORER()
+}
+
+workflow PLIF_SCORER_RMSD2   { RUN_ANALYSIS(plif_result, [label: "datesplit_plif_scorer_rmsd2",    filename: "${params.evaluator_configs}/reference_split_comparison_plif_scorer_rmsd2.yaml"]) }
+workflow PLIF_SCORER_PLIF05  { RUN_ANALYSIS(plif_result, [label: "datesplit_plif_scorer_plif0.5",  filename: "${params.evaluator_configs}/reference_split_comparison_plif_scorer_plif0.5.yaml"]) }
+workflow PLIF_SCORER_PLIF075 { RUN_ANALYSIS(plif_result, [label: "datesplit_plif_scorer_plif0.75", filename: "${params.evaluator_configs}/reference_split_comparison_plif_scorer_plif0.75.yaml"]) }
+workflow PLIF_SCORER_PLIF10  { RUN_ANALYSIS(plif_result, [label: "datesplit_plif_scorer_plif1.0",  filename: "${params.evaluator_configs}/reference_split_comparison_plif_scorer_plif1.0.yaml"]) }
+
+workflow analyze_posit_plif_scorer {
+    PLIF_SCORER_RMSD2()
+    PLIF_SCORER_PLIF05()
+    PLIF_SCORER_PLIF075()
+    PLIF_SCORER_PLIF10()
+}
+
 // ── end PLIF Recall analysis ─────────────────────────────────────────────────
