@@ -1,4 +1,5 @@
 from pathlib import Path
+import logging
 import click
 from harbor.analysis.cross_docking import Evaluator, DockingDataModel, Results
 from harbor.analysis.utils import FileLogger
@@ -38,11 +39,18 @@ from harbor.analysis.utils import FileLogger
 def run_evaluators(evaluator_jsons, input_parquet, output, n_cpus, n_bootstraps):
     output.mkdir(exist_ok=True, parents=True)
 
-    logger = FileLogger(
+    file_logger = FileLogger(
         logname="run_cross_docking_evaluators",
         path=output,
         logfile="run_cross_docking_evaluators.log",
-    ).getLogger()
+    )
+    logger = file_logger.getLogger()
+
+    # Route harbor library logs into the same file
+    harbor_logger = logging.getLogger("harbor")
+    harbor_logger.setLevel(logging.INFO)
+    for handler in logger.handlers:
+        harbor_logger.addHandler(handler)
 
     logger.info(f"Reading data model from {input_parquet}")
     data = DockingDataModel.deserialize(input_parquet)
