@@ -20,13 +20,7 @@ from harbor.analysis.cross_docking import DockingDataModel
 @click.option("--input-parquet", required=True, type=Path)
 @click.option("--plif-recall-csv", required=True, type=Path)
 @click.option("--output-parquet", required=True, type=Path)
-@click.option(
-    "--plif-recall-cutoff",
-    type=float,
-    default=0.5,
-    help="Informational only — not used in merge, just echoed to logs.",
-)
-def main(input_parquet, plif_recall_csv, output_parquet, plif_recall_cutoff):
+def main(input_parquet, plif_recall_csv, output_parquet):
     model = DockingDataModel.deserialize(input_parquet)
     df = model.dataframe
     plif = pd.read_csv(plif_recall_csv)
@@ -65,9 +59,7 @@ def main(input_parquet, plif_recall_csv, output_parquet, plif_recall_cutoff):
     ref_col = next(
         (c for c in df.columns if "Reference" in c and "Structure" in c), None
     )
-    lig_col = next(
-        (c for c in df.columns if "Query" in c and "Ligand" in c), None
-    )
+    lig_col = next((c for c in df.columns if "Query" in c and "Ligand" in c), None)
     if ref_col is None or lig_col is None:
         # Fall back: try compound_name directly
         available = list(df.columns)
@@ -79,10 +71,12 @@ def main(input_parquet, plif_recall_csv, output_parquet, plif_recall_cutoff):
     print(f"           parquet[{ref_col}] <-> plif[ReferenceStructureName]")
 
     merged = df.merge(
-        plif_best.rename(columns={
-            "compound_name": lig_col,
-            "ReferenceStructureName": ref_col,
-        }),
+        plif_best.rename(
+            columns={
+                "compound_name": lig_col,
+                "ReferenceStructureName": ref_col,
+            }
+        ),
         on=[lig_col, ref_col],
         how="left",
     )

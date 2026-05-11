@@ -213,7 +213,7 @@ process COMBINE_PLIF_RECALL {
 }
 
 process MERGE_PLIF_RECALL {
-    publishDir "${params.combinedDockingResultsPath}", mode: 'copy', overwrite: false
+    publishDir "${params.combinedDockingResultsPath}", mode: 'copy', overwrite: True
     conda "${params.harbor}"
     tag "merge-plif-recall ${name}"
     memory { 8.GB }
