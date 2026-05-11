@@ -113,8 +113,7 @@ process RUN_EVALUATORS {
     errorStrategy 'terminate'
     memory 16.GB
     time 1.h
-    // set n cpus to request
-    cpus 8
+    cpus 1
     'lenient'
 
     input:
@@ -132,7 +131,7 @@ process RUN_EVALUATORS {
     python3 "${projectDir}/scripts"/run_evaluators.py \
     evaluator_jsons_* \
     --input-parquet "${docking_results_parquet}" \
-    --n-cpus 8
+    --n-cpus 1
     """
 }
 process RUN_EVALUATORS_LIGHTWEIGHT {
