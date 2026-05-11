@@ -434,28 +434,28 @@ workflow PLIF_MERGE_POSIT {
     MERGE_PLIF_RECALL(
         "ALL_1_poses",
         results.posit_single_pose.docking_results_parquet,
+        results.posit_single_pose.docking_results_json,
         plif_csv,
     )
 }
 
-workflow PLIF_DATESPLIT_POSIT {
-    plif_parquet = "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet"
-    RUN_ANALYSIS(
-        [name: "ALL_1_poses_plif", docking_results_parquet: plif_parquet,
-         docking_results_json: results.posit_single_pose.docking_results_json],
-        [label: "datesplit_plif0.5", filename: sp5.datesplit]
-    )
-}
-workflow PLIF_X_TO_X_POSIT        { RUN_ANALYSIS([name: "ALL_1_poses_plif", docking_results_parquet: "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet", docking_results_json: results.posit_single_pose.docking_results_json], [label: "x_to_x_plif0.5",        filename: sp5.x_to_x]) }
-workflow PLIF_X_TO_X_5_POSIT      { RUN_ANALYSIS([name: "ALL_1_poses_plif", docking_results_parquet: "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet", docking_results_json: results.posit_single_pose.docking_results_json], [label: "x_to_x_5_plif0.5",      filename: sp5.x_to_x_5]) }
-workflow PLIF_X_TO_Y_POSIT        { RUN_ANALYSIS([name: "ALL_1_poses_plif", docking_results_parquet: "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet", docking_results_json: results.posit_single_pose.docking_results_json], [label: "x_to_y_plif0.5",        filename: sp5.x_to_y]) }
-workflow PLIF_X_TO_Y_5_POSIT      { RUN_ANALYSIS([name: "ALL_1_poses_plif", docking_results_parquet: "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet", docking_results_json: results.posit_single_pose.docking_results_json], [label: "x_to_y_5_plif0.5",      filename: sp5.x_to_y_5]) }
-workflow PLIF_NOT_X_TO_X_POSIT    { RUN_ANALYSIS([name: "ALL_1_poses_plif", docking_results_parquet: "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet", docking_results_json: results.posit_single_pose.docking_results_json], [label: "not_x_to_x_plif0.5",    filename: sp5.not_x_to_x]) }
-workflow PLIF_NOT_X_TO_X_5_POSIT  { RUN_ANALYSIS([name: "ALL_1_poses_plif", docking_results_parquet: "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet", docking_results_json: results.posit_single_pose.docking_results_json], [label: "not_x_to_x_5_plif0.5",  filename: sp5.not_x_to_x_5]) }
-workflow PLIF_X_TO_NOT_X_POSIT    { RUN_ANALYSIS([name: "ALL_1_poses_plif", docking_results_parquet: "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet", docking_results_json: results.posit_single_pose.docking_results_json], [label: "x_to_not_x_plif0.5",    filename: sp5.x_to_not_x]) }
-workflow PLIF_TC_POSIT            { RUN_ANALYSIS([name: "ALL_1_poses_plif", docking_results_parquet: "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet", docking_results_json: results.posit_single_pose.docking_results_json], [label: "tc_plif0.5",            filename: sp5.tc]) }
-workflow PLIF_MCS_POSIT           { RUN_ANALYSIS([name: "ALL_1_poses_plif", docking_results_parquet: "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet", docking_results_json: results.posit_single_pose.docking_results_json], [label: "mcs_plif0.5",           filename: sp5.mcs]) }
-workflow PLIF_ECFP4_POSIT         { RUN_ANALYSIS([name: "ALL_1_poses_plif", docking_results_parquet: "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet", docking_results_json: results.posit_single_pose.docking_results_json], [label: "ecfp4_plif0.5",         filename: sp5.ecfp4]) }
+def plif_result = [
+    name: "ALL_1_poses_plif",
+    docking_results_parquet: "${params.combinedDockingResultsPath}/ALL_1_poses_plif.parquet",
+    docking_results_json:    "${params.combinedDockingResultsPath}/ALL_1_poses_plif.json",
+]
+
+workflow PLIF_DATESPLIT_POSIT     { RUN_ANALYSIS(plif_result, [label: "datesplit_plif0.5",    filename: sp5.datesplit]) }
+workflow PLIF_X_TO_X_POSIT        { RUN_ANALYSIS(plif_result, [label: "x_to_x_plif0.5",        filename: sp5.x_to_x]) }
+workflow PLIF_X_TO_X_5_POSIT      { RUN_ANALYSIS(plif_result, [label: "x_to_x_5_plif0.5",      filename: sp5.x_to_x_5]) }
+workflow PLIF_X_TO_Y_POSIT        { RUN_ANALYSIS(plif_result, [label: "x_to_y_plif0.5",        filename: sp5.x_to_y]) }
+workflow PLIF_X_TO_Y_5_POSIT      { RUN_ANALYSIS(plif_result, [label: "x_to_y_5_plif0.5",      filename: sp5.x_to_y_5]) }
+workflow PLIF_NOT_X_TO_X_POSIT    { RUN_ANALYSIS(plif_result, [label: "not_x_to_x_plif0.5",    filename: sp5.not_x_to_x]) }
+workflow PLIF_NOT_X_TO_X_5_POSIT  { RUN_ANALYSIS(plif_result, [label: "not_x_to_x_5_plif0.5",  filename: sp5.not_x_to_x_5]) }
+workflow PLIF_X_TO_NOT_X_POSIT    { RUN_ANALYSIS(plif_result, [label: "x_to_not_x_plif0.5",    filename: sp5.x_to_not_x]) }
+workflow PLIF_TC_POSIT            { RUN_ANALYSIS(plif_result, [label: "tc_plif0.5",            filename: sp5.tc]) }
+workflow PLIF_MCS_POSIT           { RUN_ANALYSIS(plif_result, [label: "mcs_plif0.5",           filename: sp5.mcs]) }
+workflow PLIF_ECFP4_POSIT         { RUN_ANALYSIS(plif_result, [label: "ecfp4_plif0.5",         filename: sp5.ecfp4]) }
 
 workflow analyze_posit_plif {
     PLIF_DATESPLIT_POSIT()

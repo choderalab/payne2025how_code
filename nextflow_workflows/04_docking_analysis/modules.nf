@@ -223,10 +223,12 @@ process MERGE_PLIF_RECALL {
     input:
     val(name)
     path(input_parquet)
+    path(input_json)
     path(plif_recall_csv)
 
     output:
     path("${name}_plif.parquet"), emit: merged_parquet
+    path("${name}_plif.json"),   emit: merged_json
 
     script:
     """

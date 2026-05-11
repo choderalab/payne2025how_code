@@ -3,11 +3,17 @@ Merge PLIF recall results (from COMBINE_PLIF_RECALL) into the main docking parqu
 
 Joins on (compound_name, ReferenceStructureName) and adds the plif_tversky_recall
 column (and optionally plif_tanimoto, n_reference_interactions) to the parquet.
+
+Loads and re-serializes the DockingDataModel so that downstream steps that call
+DockingDataModel.deserialize() find a matching .json alongside the output .parquet.
+The input .json must sit next to the input .parquet (same stem, same directory) —
+Nextflow satisfies this by staging both files in the work directory.
 """
 
 import click
 import pandas as pd
 from pathlib import Path
+from harbor.analysis.cross_docking import DockingDataModel
 
 
 @click.command()
@@ -21,7 +27,8 @@ from pathlib import Path
     help="Informational only — not used in merge, just echoed to logs.",
 )
 def main(input_parquet, plif_recall_csv, output_parquet, plif_recall_cutoff):
-    df = pd.read_parquet(input_parquet)
+    model = DockingDataModel.deserialize(input_parquet)
+    df = model.dataframe
     plif = pd.read_csv(plif_recall_csv)
 
     print(f"Docking parquet rows: {len(df)}")
@@ -83,8 +90,20 @@ def main(input_parquet, plif_recall_csv, output_parquet, plif_recall_cutoff):
     n_matched = merged["plif_tversky_recall"].notna().sum()
     print(f"Rows with PLIF recall:  {n_matched} / {len(merged)}")
 
-    merged.to_parquet(output_parquet, index=False)
-    print(f"Written to {output_parquet}")
+    # Re-serialize as a DockingDataModel so the downstream deserialize() call finds
+    # a matching .json alongside the .parquet.
+    updated = DockingDataModel(
+        dataframe=merged,
+        name=model.name,
+        type=model.type,
+        data_types_dict=model.data_types_dict,
+        key_columns_dict=model.key_columns_dict,
+        param_columns_dict=model.param_columns_dict,
+        value_columns_dict=model.value_columns_dict,
+    )
+    output_prefix = output_parquet.with_suffix("")
+    updated.serialize(output_prefix)
+    print(f"Written to {output_prefix}.parquet + {output_prefix}.json")
 
 
 if __name__ == "__main__":
