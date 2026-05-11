@@ -90,16 +90,25 @@ def main(input_parquet, plif_recall_csv, output_parquet, plif_recall_cutoff):
     n_matched = merged["plif_tversky_recall"].notna().sum()
     print(f"Rows with PLIF recall:  {n_matched} / {len(merged)}")
 
-    # Re-serialize as a DockingDataModel so the downstream deserialize() call finds
-    # a matching .json alongside the .parquet.
+    # Rename PLIF value columns to PLIFData_ prefix so they are registered as a
+    # proper sub-model in the DockingDataModel JSON (same pattern as ProteinRMSDData).
+    plif_raw_cols = [c for c in merged.columns if c not in df.columns]
+    rename_map = {c: f"PLIFData_{c}" for c in plif_raw_cols}
+    merged = merged.rename(columns=rename_map)
+    plif_prefixed_cols = [f"PLIFData_{c}" for c in plif_raw_cols]
+    print(f"PLIFData columns registered: {plif_prefixed_cols}")
+
+    # PLIFData joins on the same keys as PoseData (one PLIF value per pose row).
+    plif_key_cols = [lig_col, ref_col]
+
     updated = DockingDataModel(
         dataframe=merged,
         name=model.name,
         type=model.type,
-        data_types_dict=model.data_types_dict,
-        key_columns_dict=model.key_columns_dict,
-        param_columns_dict=model.param_columns_dict,
-        value_columns_dict=model.value_columns_dict,
+        data_types_dict={**model.data_types_dict, "PLIFData": "PoseData"},
+        key_columns_dict={**model.key_columns_dict, "PLIFData": plif_key_cols},
+        param_columns_dict={**model.param_columns_dict, "PLIFData": []},
+        value_columns_dict={**model.value_columns_dict, "PLIFData": plif_prefixed_cols},
     )
     output_prefix = output_parquet.with_suffix("")
     updated.serialize(output_prefix)

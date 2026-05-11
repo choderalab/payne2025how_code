@@ -35,7 +35,7 @@ def main(output, plif_cutoff):
     default = EvaluatorFactory(name="default")
 
     default.success_rate_evaluator_settings.use = True
-    default.success_rate_evaluator_settings.success_rate_column = "plif_tversky_recall"
+    default.success_rate_evaluator_settings.success_rate_column = "PLIFData_plif_tversky_recall"
     default.success_rate_evaluator_settings.rmsd_cutoff = plif_cutoff
     default.success_rate_evaluator_settings.below_cutoff_is_good = False
 
