@@ -322,7 +322,7 @@ workflow FRED_MULTIPOSE_ANALYSIS {
 }
 workflow SCAFFOLD_DATE_SPLIT {
     name = "posit_scaffold_date_split"
-    script_path = "${params.scripts}/create_evaluators_scaffold_datesplit.py"
+    script_path = "${projectDir}/scripts/create_evaluators_scaffold_datesplit.py"
 
     CREATE_EVALUATORS_MODULAR(
         name,
@@ -355,7 +355,7 @@ workflow SCAFFOLD_DATE_SPLIT {
 }
 workflow POSIT_REVERSE_SIMILARITY_SPLIT {
     name = "posit_reverse_similarity_split"
-    script_path = "${params.scripts}/create_reverse_similarity_split_evaluators.py"
+    script_path = "${projectDir}/scripts/create_reverse_similarity_split_evaluators.py"
 
     CREATE_EVALUATORS_MODULAR(
         name,

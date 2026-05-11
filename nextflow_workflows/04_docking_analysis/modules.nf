@@ -271,7 +271,7 @@ process COMBINE_EVALUATIONS {
 
     script:
     """
-    python "${params.scripts}/combine_evaluation_results.py" \
+    python3 "${projectDir}/scripts"/combine_evaluation_results.py \
     evaluator_results_* \
     "${name}_combined_results.csv"
     """
