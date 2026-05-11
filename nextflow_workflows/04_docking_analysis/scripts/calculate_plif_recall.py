@@ -26,6 +26,7 @@ import tempfile
 import time
 from collections import defaultdict
 from pathlib import Path
+from tqdm import tqdm
 
 import click
 import pandas as pd
@@ -173,50 +174,71 @@ def best_plif_recall_across_structures(
     level: FingerprintLevel,
     ligand_id: str,
     logger,
+    ref_report_cache: dict,
 ) -> tuple[dict, str]:
     """
     Run PLIP against all cached original crystal structures for a compound and
     return the scores from the best-matching structure (max Tversky recall) plus
     the winning structure name.
+
+    ref_report_cache maps struct_name -> PLIntReport | None and is shared across
+    all poses. Each SDF contains one compound docked against many references, so
+    the crystal ref_report is identical for every pose and only needs to be
+    computed once.
     """
     best_scores = None
     best_struct = None
 
     for struct_name, cache_dir in crystal_structures:
         protein_pdb = cache_dir / f"{struct_name}.pdb"
-        if not protein_pdb.exists():
-            logger.warning(f"Protein PDB not found: {protein_pdb}, skipping")
-            continue
 
-        crystal_sdf = find_crystal_ligand_sdf(cache_dir, logger)
-        if crystal_sdf is None:
-            logger.warning(f"No crystal ligand SDF in {cache_dir}, skipping")
-            continue
+        # ref_report depends only on the crystal structure, not the docked pose.
+        # Compute on first miss; cache None for failures so we don't retry.
+        if struct_name not in ref_report_cache:
+            if not protein_pdb.exists():
+                logger.warning(f"Protein PDB not found: {protein_pdb}, skipping")
+                ref_report_cache[struct_name] = None
+            else:
+                crystal_sdf = find_crystal_ligand_sdf(cache_dir, logger)
+                if crystal_sdf is None:
+                    logger.warning(f"No crystal ligand SDF in {cache_dir}, skipping")
+                    ref_report_cache[struct_name] = None
+                else:
+                    crystal_ligs = MolFileFactory(filename=crystal_sdf).load()
+                    if not crystal_ligs:
+                        logger.warning(f"Could not read crystal ligand from {crystal_sdf}, skipping")
+                        ref_report_cache[struct_name] = None
+                    else:
+                        try:
+                            ref_report_cache[struct_name] = plip_report_from_protein_and_ligand(
+                                protein_pdb, crystal_ligs[0].to_oemol(), ligand_id
+                            )
+                        except Exception as e:
+                            logger.warning(f"PLIP failed for crystal ref {struct_name}: {e}")
+                            ref_report_cache[struct_name] = None
 
-        crystal_ligs = MolFileFactory(filename=crystal_sdf).load()
-        if not crystal_ligs:
-            logger.warning(f"Could not read crystal ligand from {crystal_sdf}, skipping")
+        ref_report = ref_report_cache[struct_name]
+        if ref_report is None:
             continue
 
         try:
-            ref_report = plip_report_from_protein_and_ligand(
-                protein_pdb, crystal_ligs[0].to_oemol(), ligand_id
-            )
             query_report = plip_report_from_protein_and_ligand(
                 protein_pdb, posed_lig_mol, ligand_id
             )
             scores = compute_plif_recall(ref_report, query_report, level)
         except Exception as e:
-            logger.warning(f"PLIP failed for {struct_name}: {e}")
+            logger.warning(f"PLIP failed for query vs {struct_name}: {e}")
             continue
 
         recall = scores["plif_tversky_recall"]
         if best_scores is None or (
             recall is not None
             and not pd.isna(recall)
-            and (best_scores["plif_tversky_recall"] is None
-                 or pd.isna(best_scores["plif_tversky_recall"])
-                 or recall > best_scores["plif_tversky_recall"])
+            and (
+                best_scores["plif_tversky_recall"] is None
+                or pd.isna(best_scores["plif_tversky_recall"])
+                or recall > best_scores["plif_tversky_recall"]
+            )
         ):
             best_scores = scores
             best_struct = struct_name
@@ -269,7 +291,9 @@ def main(docked_sdf, cache_dir, cmpd_dict, output_csv, fingerprint_level, ligand
 
     cache_lookup = build_cache_lookup(cache_dir)
     base_to_cache_keys = build_base_to_cache_keys(cache_lookup)
-    cmpd_to_entries = build_cmpd_to_cache_entries(cmpd_dict, cache_lookup, base_to_cache_keys)
+    cmpd_to_entries = build_cmpd_to_cache_entries(
+        cmpd_dict, cache_lookup, base_to_cache_keys
+    )
 
     logger.info(f"Cache lookup built: {len(cache_lookup)} entries from {cache_dir}")
     logger.info(f"Compound dict loaded: {len(cmpd_to_entries)} compounds")
@@ -280,21 +304,25 @@ def main(docked_sdf, cache_dir, cmpd_dict, output_csv, fingerprint_level, ligand
     results = []
     plip_times = []
     n_no_crystal = 0
+    ref_report_cache: dict = {}
 
-    for posed_lig in docked_poses:
+    for posed_lig in tqdm(docked_poses):
         compound_name = posed_lig.compound_name
         docking_ref = posed_lig.tags["ReferenceStructureName"]
         pose_id = posed_lig.tags["Pose_ID"]
 
         crystal_structures = cmpd_to_entries.get(compound_name, [])
         if not crystal_structures:
-            logger.warning(f"No original crystal structures found for {compound_name}, skipping")
+            logger.warning(
+                f"No original crystal structures found for {compound_name}, skipping"
+            )
             n_no_crystal += 1
             continue
 
         t0 = time.perf_counter()
         scores, best_struct = best_plif_recall_across_structures(
-            posed_lig.to_oemol(), crystal_structures, level, ligand_id, logger
+            posed_lig.to_oemol(), crystal_structures, level, ligand_id, logger,
+            ref_report_cache,
         )
         plip_times.append(time.perf_counter() - t0)
 
@@ -309,23 +337,29 @@ def main(docked_sdf, cache_dir, cmpd_dict, output_csv, fingerprint_level, ligand
             }
             best_struct = None
 
-        results.append({
-            "compound_name": compound_name,
-            "Pose_ID": pose_id,
-            "ReferenceStructureName": docking_ref,
-            "OriginalCrystalStructure": best_struct,
-            "n_crystal_structures_checked": len(crystal_structures),
-            "fingerprint_level": fingerprint_level,
-            **scores,
-        })
+        results.append(
+            {
+                "compound_name": compound_name,
+                "Pose_ID": pose_id,
+                "ReferenceStructureName": docking_ref,
+                "OriginalCrystalStructure": best_struct,
+                "n_crystal_structures_checked": len(crystal_structures),
+                "fingerprint_level": fingerprint_level,
+                **scores,
+            }
+        )
 
     if plip_times:
         avg = sum(plip_times) / len(plip_times)
+        n_cached = sum(1 for v in ref_report_cache.values() if v is not None)
         logger.info(
-            f"PLIP timing: {len(plip_times)} poses, avg {avg:.3f}s/pose, total {sum(plip_times):.1f}s"
+            f"PLIF timing: {len(plip_times)} poses, avg {avg:.3f}s/pose, total {sum(plip_times):.1f}s"
+            f" | ref_report cache: {n_cached} hits / {len(ref_report_cache)} unique structures"
         )
     if n_no_crystal:
-        logger.warning(f"{n_no_crystal} poses had no original crystal structure in dict")
+        logger.warning(
+            f"{n_no_crystal} poses had no original crystal structure in dict"
+        )
 
     pd.DataFrame(results).to_csv(output_csv, index=False)
     logger.info(f"Wrote {len(results)} records to {output_csv}")
