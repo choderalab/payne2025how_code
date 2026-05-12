@@ -505,20 +505,12 @@ workflow PLIF_NOT_X_TO_X_POSIT_1_0    { RUN_ANALYSIS(plif_result, [label: "not_x
 workflow PLIF_NOT_X_TO_X_5_POSIT_1_0  { RUN_ANALYSIS(plif_result, [label: "not_x_to_x_5_plif1",    filename: sp10.not_x_to_x_5]) }
 workflow PLIF_X_TO_NOT_X_POSIT_1_0    { RUN_ANALYSIS(plif_result, [label: "x_to_not_x_plif1",      filename: sp10.x_to_not_x]) }
 
-// Composite: date+random splits at all three cutoffs + matching scaffold splits
+// Composite: datesplit at all three PLIF recall cutoffs.
+// Scaffold splits have their own workflows above for individual invocation.
 workflow analyze_posit_plif_cutoffs {
     PLIF_DATESPLIT_POSIT()
     PLIF_DATESPLIT_POSIT_0_75()
     PLIF_DATESPLIT_POSIT_1_0()
-    PLIF_X_TO_X_POSIT()
-    PLIF_X_TO_X_POSIT_0_75()
-    PLIF_X_TO_X_POSIT_1_0()
-    PLIF_NOT_X_TO_X_POSIT()
-    PLIF_NOT_X_TO_X_POSIT_0_75()
-    PLIF_NOT_X_TO_X_POSIT_1_0()
-    PLIF_X_TO_NOT_X_POSIT()
-    PLIF_X_TO_NOT_X_POSIT_0_75()
-    PLIF_X_TO_NOT_X_POSIT_1_0()
 }
 
 // ── PLIF Recall as scoring method ────────────────────────────────────────────
